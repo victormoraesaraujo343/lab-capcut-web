@@ -1,7 +1,8 @@
 .topbar {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: space-between;
+  gap: var(--space-2);
   height: 44px;
   padding: 0 var(--space-3);
   background: var(--bg-panel-alt);
@@ -9,16 +10,69 @@
   box-sizing: border-box;
 }
 
+.left {
+  display: flex;
+  align-items: center;
+  justify-self: start;
+  min-width: 0;
+}
+
+.center {
+  min-width: 0;
+  max-width: 100%;
+}
+
 .appName {
   margin: 0;
   font-size: var(--font-size-md);
   font-weight: 600;
   color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nameButton {
+  max-width: 100%;
+  padding: 2px var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: text;
+}
+
+.nameButton:hover {
+  background: var(--bg-hover);
+}
+
+.nameButton:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.nameInput {
+  width: min(320px, 60vw);
+  height: 26px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--focus-ring);
+  border-radius: var(--radius-sm);
+  background: var(--bg-app);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--font-size-md);
+  box-sizing: border-box;
+  outline: none;
 }
 
 .right {
   display: flex;
   align-items: center;
+  justify-self: end;
   gap: var(--space-2);
 }
 

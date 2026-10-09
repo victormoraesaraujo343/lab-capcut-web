@@ -1,12 +1,12 @@
 # PROGRESSO — Editor de vídeo no navegador
 
-Orquestrador: Sonnet. Agentes: Haiku (tarefas), Sonnet (revisor).
+Orquestrador: Opus 5.5. Agentes: Haiku (tarefas), Sonnet (revisor).
 
 | Etapa | Nome | Estado |
 |---|---|---|
 | 1 | Esqueleto e tipos | ✅ passou |
-| 2 | Importar mídia | em andamento |
-| 3 | Linha do tempo | pendente |
+| 2 | Importar mídia | ✅ passou |
+| 3 | Linha do tempo | em andamento |
 | 4 | Prévia e reprodução | pendente |
 | 5 | Exportar | pendente |
 | 6 | Texto | pendente |
@@ -24,3 +24,10 @@ Orquestrador: Sonnet. Agentes: Haiku (tarefas), Sonnet (revisor).
 - Tema claro: acento #0e7490 (não #0891b2) pra passar contraste AA.
 - Pendência pequena: texto dentro da caixa preta da prévia fica apagado no tema claro (some quando virar canvas na etapa 4).
 - `src/types/project.ts` tem ~313 linhas: dividir (clip.ts) quando crescer.
+- Etapa 2 passou. Teste real no navegador: 3 vídeos (mp4/mov/webm) + mp3 + png importados, página recarregada, tudo voltou com miniaturas e forma de onda. Revisor: PASSA. 163 testes.
+- Arquivos de teste em `tests/fixtures/media/` (gerados com ffmpeg). Pra injetar no navegador: fetch de `/tests/fixtures/media/<nome>` + DataTransfer no input de arquivo.
+- Decisão: `fake-indexeddb` como devDependency só de teste.
+- Decisão: miniaturas = <video> faz seek na thread principal, worker codifica JPEG e grava no OPFS; onda = decodeAudioData na principal (não existe em worker), picos no worker.
+- Decisão: mídia por projeto em `projects/<id>/media|thumbs`; duplicar copia a pasta e reescreve caminhos.
+- Correções pós-revisão: importa direto na pasta, timeouts nas miniaturas, avisos de erro (toaster), soltar arquivo fora do painel não sai do app.
+- Lição: depois de vários agentes editarem ao mesmo tempo, o servidor de dev pode ficar com módulo velho → reiniciar o preview.

@@ -1,0 +1,170 @@
+// Painel de mídia: busca, pastas, importação por botão ou arrastar arquivos, erros e grade de cards.
+
+import { useMemo, useRef, useState, type ChangeEvent, type DragEvent } from 'react';
+import { Film, Search, Upload } from 'lucide-react';
+import { ACCEPT_ATTRIBUTE } from '@/engine/decode/mediaKind';
+import { PanelShell } from '@/features/layout/PanelShell';
+import { t } from '@/i18n/pt-BR';
+import { useProjectStore } from '@/stores';
+import { FolderBar } from './FolderBar';
+import { ImportStatus } from './ImportStatus';
+import { MediaCard, isAssetDrag } from './MediaCard';
+import { filterAssets } from './filterAssets';
+import styles from './MediaPanel.module.css';
+
+/** Indica se um DataTransfer carrega arquivos vindos do sistema (e não um card arrastado do painel). */
+function carriesFiles(dataTransfer: DataTransfer): boolean {
+  return !isAssetDrag(dataTransfer) && Array.from(dataTransfer.types).includes('Files');
+}
+
+/** Painel completo de mídia do projeto aberto; sem projeto, mostra só o cabeçalho com o botão de importar desabilitado. */
+export function MediaPanel() {
+  const project = useProjectStore((s) => s.project);
+  const importProgress = useProjectStore((s) => s.importProgress);
+  const importErrors = useProjectStore((s) => s.importErrors);
+  const importFiles = useProjectStore((s) => s.importFiles);
+  const removeAsset = useProjectStore((s) => s.removeAsset);
+  const dismissImportError = useProjectStore((s) => s.dismissImportError);
+  const createFolder = useProjectStore((s) => s.createFolder);
+  const renameFolder = useProjectStore((s) => s.renameFolder);
+  const deleteFolder = useProjectStore((s) => s.deleteFolder);
+  const moveAssetToFolder = useProjectStore((s) => s.moveAssetToFolder);
+
+  const [query, setQuery] = useState('');
+  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+  const [filesDragging, setFilesDragging] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const activeFolderId = project?.folders.some((folder) => folder.id === selectedFolderId) ? selectedFolderId : null;
+  const visibleAssets = useMemo(
+    () => (project === null ? [] : filterAssets(project.assets, query, activeFolderId)),
+    [project, query, activeFolderId],
+  );
+
+  /** Recebe os arquivos escolhidos no seletor do sistema. */
+  function handleFileInput(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = '';
+    if (files.length > 0) {
+      void importFiles(files, activeFolderId ?? undefined);
+    }
+  }
+
+  /** Mostra o overlay quando arquivos do sistema entram sobre o painel. */
+  function handleDragOver(event: DragEvent<HTMLDivElement>) {
+    if (!carriesFiles(event.dataTransfer)) {
+      return;
+    }
+    event.preventDefault();
+    setFilesDragging(true);
+  }
+
+  /** Esconde o overlay quando o cursor sai do painel. */
+  function handleDragLeave(event: DragEvent<HTMLDivElement>) {
+    const next = event.relatedTarget;
+    if (next instanceof Node && event.currentTarget.contains(next)) {
+      return;
+    }
+    setFilesDragging(false);
+  }
+
+  /** Importa os arquivos soltados sobre o painel. */
+  function handleDrop(event: DragEvent<HTMLDivElement>) {
+    if (!carriesFiles(event.dataTransfer)) {
+      return;
+    }
+    event.preventDefault();
+    setFilesDragging(false);
+    const files = Array.from(event.dataTransfer.files);
+    if (project !== null && files.length > 0) {
+      void importFiles(files, activeFolderId ?? undefined);
+    }
+  }
+
+  const importButton = (
+    <button
+      type="button"
+      className={styles.importButton}
+      disabled={project === null}
+      onClick={() => inputRef.current?.click()}
+    >
+      <Upload size={14} strokeWidth={1.75} aria-hidden="true" />
+      <span>{t.media.import}</span>
+    </button>
+  );
+
+  return (
+    <div
+      className={styles.root}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      <PanelShell title={t.panels.media} actions={importButton}>
+        <input
+          ref={inputRef}
+          type="file"
+          multiple
+          hidden
+          accept={ACCEPT_ATTRIBUTE}
+          onChange={handleFileInput}
+        />
+
+        {project === null ? null : (
+          <div className={styles.content}>
+            <div className={styles.search}>
+              <Search size={14} strokeWidth={1.75} aria-hidden="true" />
+              <input
+                type="search"
+                className={styles.searchInput}
+                placeholder={t.media.search}
+                aria-label={t.media.search}
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            </div>
+
+            <FolderBar
+              folders={project.folders}
+              activeFolderId={activeFolderId}
+              onSelect={setSelectedFolderId}
+              onCreate={createFolder}
+              onRename={renameFolder}
+              onDelete={deleteFolder}
+              onDropAsset={moveAssetToFolder}
+            />
+
+            <ImportStatus progress={importProgress} errors={importErrors} onDismiss={dismissImportError} />
+
+            {project.assets.length === 0 ? (
+              <div className={styles.empty}>
+                <Film size={32} strokeWidth={1.5} aria-hidden="true" />
+                <p className={styles.emptyText}>{t.media.empty}</p>
+              </div>
+            ) : visibleAssets.length === 0 ? (
+              <p className={styles.emptyText}>{t.media.noResults}</p>
+            ) : (
+              <ul className={styles.grid} aria-label={t.panels.media}>
+                {visibleAssets.map((asset) => (
+                  <MediaCard
+                    key={asset.id}
+                    asset={asset}
+                    folders={project.folders}
+                    onMove={moveAssetToFolder}
+                    onRemove={removeAsset}
+                  />
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </PanelShell>
+
+      {filesDragging && project !== null ? (
+        <div className={styles.dropOverlay}>
+          <span className={styles.dropText}>{t.media.dropHere}</span>
+        </div>
+      ) : null}
+    </div>
+  );
+}

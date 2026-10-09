@@ -1,0 +1,101 @@
+.editor {
+  display: grid;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background: var(--bg-app);
+  color: var(--text);
+}
+
+.cell {
+  min-width: 0;
+  min-height: 0;
+}
+
+.top {
+  grid-column: 1 / -1;
+  grid-row: 1;
+}
+
+.media {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.handleMedia {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.preview {
+  grid-column: 3;
+  grid-row: 2;
+}
+
+.handleInspector {
+  grid-column: 4;
+  grid-row: 2;
+}
+
+.inspector {
+  grid-column: 5;
+  grid-row: 2;
+}
+
+.handleTimeline {
+  grid-column: 1 / -1;
+  grid-row: 3;
+}
+
+.timeline {
+  grid-column: 1 / -1;
+  grid-row: 4;
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  height: 100%;
+  padding: var(--space-4);
+  box-sizing: border-box;
+  color: var(--text-faint);
+  text-align: center;
+}
+
+.emptyIcon {
+  opacity: 0.6;
+}
+
+.emptyText {
+  margin: 0;
+  font-size: var(--font-size-sm);
+}
+
+.stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  padding: var(--space-4);
+  container-type: size;
+}
+
+.screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: min(100cqw, calc(100cqh * 16 / 9));
+  aspect-ratio: 16 / 9;
+  background: #000;
+  border-radius: var(--radius-sm);
+}
+
+.screenText {
+  color: var(--text-faint);
+  font-size: var(--font-size-sm);
+}
