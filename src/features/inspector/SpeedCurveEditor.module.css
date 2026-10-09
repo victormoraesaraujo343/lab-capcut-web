@@ -1,0 +1,70 @@
+/* Editor de curva de velocidade: gráfico SVG responsivo com pontos arrastáveis. */
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-panel-alt);
+  touch-action: none;
+  user-select: none;
+  cursor: crosshair;
+}
+
+.grid {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.guide {
+  stroke: var(--text-faint);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+}
+
+.curve {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.point {
+  fill: var(--bg-panel);
+  stroke: var(--accent);
+  stroke-width: 2;
+  cursor: grab;
+}
+
+.point:hover {
+  fill: var(--accent);
+}
+
+.point:focus {
+  outline: none;
+}
+
+.point:focus-visible {
+  stroke: var(--focus-ring);
+  stroke-width: 3;
+}
+
+.axis {
+  fill: var(--text-faint);
+  font-size: 9px;
+  font-family: inherit;
+}
+
+.hint {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--text-faint);
+  line-height: 1.4;
+}

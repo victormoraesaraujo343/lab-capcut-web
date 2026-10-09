@@ -3,9 +3,11 @@ import { cleanup, createEvent, fireEvent, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TrackRow } from '@/features/timeline/TrackRow';
 import { ASSET_DRAG_MIME } from '@/features/timeline/layout';
+import { TRANSITION_DRAG_MIME } from '@/features/library/transitionDrag';
 import { defaultTextStyle } from '@/engine/text/defaultTextStyle';
 import { useTimelineStore } from '@/stores/timelineStore';
 import { addAssetToTimeline, selectClip } from '@/stores/timelineCommands';
+import { removeTransition, setTransition } from '@/stores/transitionCommands';
 import { defaultAudioFx, defaultSpeed, defaultTransform, type Clip, type Track } from '@/types';
 
 vi.mock('@/engine/storage/opfs', () => ({
@@ -24,6 +26,11 @@ vi.mock('@/stores/timelineCommands', async (importOriginal) => {
     addAssetToTimeline: vi.fn(),
   };
 });
+
+vi.mock('@/stores/transitionCommands', () => ({
+  setTransition: vi.fn(),
+  removeTransition: vi.fn(),
+}));
 
 /** Cria um clipe de teste na trilha dada. */
 function makeClip(id: string, startMs: number, durationMs: number): Clip {
@@ -49,6 +56,13 @@ function makeClip(id: string, startMs: number, durationMs: number): Clip {
 /** Cria uma trilha de teste com os clipes dados. */
 function makeTrack(clips: Clip[], overrides: Partial<Track> = {}): Track {
   return { id: 't1', kind: 'text', name: 'Texto 1', clips, muted: false, locked: false, hidden: false, ...overrides };
+}
+
+/** Evento de arrasto com a posição X do ponteiro (o jsdom não aplica clientX em eventos de arrasto). */
+function dragAt(type: 'dragOver' | 'drop', clientX: number, dataTransfer: Record<string, unknown>): Event {
+  const event = createEvent[type](document.body, { dataTransfer });
+  Object.defineProperty(event, 'clientX', { value: clientX });
+  return event;
 }
 
 describe('TrackRow', () => {
@@ -152,5 +166,91 @@ describe('TrackRow', () => {
     expect(row?.dataset.locked).toBe('true');
     fireEvent.pointerDown(clip, { button: 0, clientX: 10, clientY: 10 });
     expect(selectClip).not.toHaveBeenCalled();
+  });
+
+  describe('transições no corte', () => {
+    /** Trilha de vídeo com dois clipes encostados em 1000 ms; o primeiro pode ter transição de saída. */
+    function videoTrack(transitionOut?: Clip['transitionOut'], locked = false): Track {
+      const first = { ...makeClip('a', 0, 1000), ...(transitionOut ? { transitionOut } : {}) };
+      return makeTrack([first, makeClip('b', 1000, 1000)], { kind: 'video', locked });
+    }
+
+    beforeEach(() => {
+      vi.mocked(setTransition).mockClear();
+      vi.mocked(removeTransition).mockClear();
+    });
+
+    it('mostra o bloco da transição sobre o corte, com a largura da janela', () => {
+      const track = videoTrack({ type: 'dissolve', durationMs: 500, params: {} });
+      const { container } = render(<TrackRow track={track} trackIndex={0} zoom={100} />);
+      const marker = container.querySelector<HTMLElement>('[data-transition-clip="a"]');
+      expect(marker?.style.left).toBe('75px');
+      expect(marker?.style.width).toBe('50px');
+    });
+
+    it('clicar no bloco seleciona o clipe que sai', () => {
+      const track = videoTrack({ type: 'dissolve', durationMs: 500, params: {} });
+      const { container } = render(<TrackRow track={track} trackIndex={0} zoom={100} />);
+      const marker = container.querySelector<HTMLElement>('[data-transition-clip="a"]');
+      if (marker === null) throw new Error('marcador não renderizado');
+      fireEvent.click(marker);
+      expect(selectClip).toHaveBeenCalledWith('a', false);
+    });
+
+    it('o botão × remove a transição do clipe que sai', () => {
+      const track = videoTrack({ type: 'dissolve', durationMs: 500, params: {} });
+      const { container } = render(<TrackRow track={track} trackIndex={0} zoom={100} />);
+      const remove = container.querySelector<HTMLButtonElement>('[data-transition-clip="a"] button');
+      if (remove === null) throw new Error('botão de remover não renderizado');
+      fireEvent.click(remove);
+      expect(removeTransition).toHaveBeenCalledWith('a');
+      expect(selectClip).not.toHaveBeenCalled();
+    });
+
+    it('sem transição e sem arrasto não aparece alvo no corte', () => {
+      const { container } = render(<TrackRow track={videoTrack()} trackIndex={0} zoom={100} />);
+      expect(container.querySelector('[class*="target"]')).toBeNull();
+    });
+
+    it('durante um arrasto de transição aparece um alvo no corte', () => {
+      const { container } = render(<TrackRow track={videoTrack()} trackIndex={0} zoom={100} />);
+      fireEvent(window, Object.assign(new Event('dragstart'), { dataTransfer: { types: [TRANSITION_DRAG_MIME] } }));
+      expect(container.querySelectorAll('[class*="target"]').length).toBe(1);
+      fireEvent(window, new Event('dragend'));
+      expect(container.querySelector('[class*="target"]')).toBeNull();
+    });
+
+    it('arrastar a transição até perto do corte destaca o alvo', () => {
+      const { container } = render(<TrackRow track={videoTrack()} trackIndex={0} zoom={100} />);
+      fireEvent(window, Object.assign(new Event('dragstart'), { dataTransfer: { types: [TRANSITION_DRAG_MIME] } }));
+      const row = container.querySelector<HTMLElement>('[data-track-id="t1"]');
+      if (row === null) throw new Error('trilha não renderizada');
+      fireEvent(row, dragAt('dragOver', 110, { types: [TRANSITION_DRAG_MIME] }));
+      expect(container.querySelector('[class*="targetHover"]')).not.toBeNull();
+    });
+
+    it('soltar a transição perto do corte põe a transição no clipe que sai', () => {
+      const { container } = render(<TrackRow track={videoTrack()} trackIndex={0} zoom={100} />);
+      const row = container.querySelector<HTMLElement>('[data-track-id="t1"]');
+      if (row === null) throw new Error('trilha não renderizada');
+      fireEvent(row, dragAt('drop', 103, { types: [TRANSITION_DRAG_MIME], getData: () => 'dissolve' }));
+      expect(setTransition).toHaveBeenCalledWith('a', 'dissolve');
+    });
+
+    it('soltar longe de qualquer corte não põe transição', () => {
+      const { container } = render(<TrackRow track={videoTrack()} trackIndex={0} zoom={100} />);
+      const row = container.querySelector<HTMLElement>('[data-track-id="t1"]');
+      if (row === null) throw new Error('trilha não renderizada');
+      fireEvent(row, dragAt('drop', 300, { types: [TRANSITION_DRAG_MIME], getData: () => 'dissolve' }));
+      expect(setTransition).not.toHaveBeenCalled();
+    });
+
+    it('trilha travada não aceita transição', () => {
+      const { container } = render(<TrackRow track={videoTrack(undefined, true)} trackIndex={0} zoom={100} />);
+      const row = container.querySelector<HTMLElement>('[data-track-id="t1"]');
+      if (row === null) throw new Error('trilha não renderizada');
+      fireEvent(row, dragAt('drop', 103, { types: [TRANSITION_DRAG_MIME], getData: () => 'dissolve' }));
+      expect(setTransition).not.toHaveBeenCalled();
+    });
   });
 });

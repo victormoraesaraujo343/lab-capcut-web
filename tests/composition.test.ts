@@ -4,6 +4,7 @@ import {
   activeAudioClips,
   clipLocalTime,
   clipMediaTime,
+  clipPlaybackRate,
   resolveLayers,
 } from '@/engine/render/composition';
 import {
@@ -384,5 +385,62 @@ describe('parâmetros animados e máscara', () => {
     });
     const layers = resolveLayers(makeProject([makeTrack('v', 'video', [clip])], [makeAsset()]), 500);
     expect(layers[0]?.matte).toBeUndefined();
+  });
+});
+
+describe('taxa de reprodução por curva', () => {
+  const rampSpeed = { ...defaultSpeed(), mode: 'curve' as const, curve: [{ t: 0, speed: 1 }, { t: 1, speed: 3 }] };
+
+  it('usa a curva no ponto local do clipe', () => {
+    const clip = makeClip({ speed: rampSpeed });
+    expect(clipPlaybackRate(clip, 500)).toBeCloseTo(2);
+    expect(clipPlaybackRate(clip, 0)).toBeCloseTo(1);
+  });
+
+  it('no clipe invertido usa o ponto espelhado da curva', () => {
+    const clip = makeClip({ speed: rampSpeed, reversed: true });
+    expect(clipPlaybackRate(clip, 0)).toBeCloseTo(3);
+  });
+
+  it('no modo constante continua usando o valor da velocidade', () => {
+    expect(clipPlaybackRate(makeClip({ speed: { ...defaultSpeed(), value: 4 } }), 300)).toBe(4);
+  });
+
+  it('a camada leva a taxa da curva no instante da timeline', () => {
+    const clip = makeClip({ speed: rampSpeed });
+    const layers = resolveLayers(makeProject([makeTrack('t1', 'video', [clip])], [makeAsset()]), 500);
+    expect(layers[0]?.playbackRate).toBeCloseTo(2);
+  });
+});
+
+describe('atraso da máscara do removeBackground', () => {
+  it('subtrai matteOffsetMs do tempo de mídia da máscara', () => {
+    const clip = makeClip({
+      trimInMs: 200,
+      effects: [{ id: 'fx1', type: 'removeBackground', params: { matteAssetId: 'm1', matteOffsetMs: 100 } }],
+    });
+    const matte = makeAsset({ id: 'm1', role: 'matte', sourceAssetId: 'a1' });
+    const layers = resolveLayers(makeProject([makeTrack('v', 'video', [clip])], [makeAsset(), matte]), 500);
+    expect(layers[0]?.matte).toEqual({ assetId: 'm1', mediaTimeMs: 600 });
+  });
+
+  it('sem matteOffsetMs o atraso é zero', () => {
+    const clip = makeClip({
+      trimInMs: 200,
+      effects: [{ id: 'fx1', type: 'removeBackground', params: { matteAssetId: 'm1' } }],
+    });
+    const matte = makeAsset({ id: 'm1', role: 'matte', sourceAssetId: 'a1' });
+    const layers = resolveLayers(makeProject([makeTrack('v', 'video', [clip])], [makeAsset(), matte]), 500);
+    expect(layers[0]?.matte).toEqual({ assetId: 'm1', mediaTimeMs: 700 });
+  });
+
+  it('o tempo da máscara não fica negativo', () => {
+    const clip = makeClip({
+      trimInMs: 200,
+      effects: [{ id: 'fx1', type: 'removeBackground', params: { matteAssetId: 'm1', matteOffsetMs: 5000 } }],
+    });
+    const matte = makeAsset({ id: 'm1', role: 'matte', sourceAssetId: 'a1' });
+    const layers = resolveLayers(makeProject([makeTrack('v', 'video', [clip])], [makeAsset(), matte]), 500);
+    expect(layers[0]?.matte).toEqual({ assetId: 'm1', mediaTimeMs: 0 });
   });
 });

@@ -10,8 +10,8 @@ Orquestrador: Opus 5.5. Agentes: Haiku (tarefas), Sonnet (revisor).
 | 4 | Prévia e reprodução | ✅ passou |
 | 5 | Exportar | ✅ passou |
 | 6 | Texto | ✅ passou |
-| 7 | Transições, filtros, efeitos, velocidade | em andamento |
-| 8 | Áudio | pendente |
+| 7 | Transições, filtros, efeitos, velocidade | ✅ passou |
+| 8 | Áudio | em andamento |
 | 9 | Stickers, formas, sobreposições | pendente |
 | 10 | Polimento e Pro liberado | pendente |
 
@@ -66,3 +66,9 @@ Orquestrador: Opus 5.5. Agentes: Haiku (tarefas), Sonnet (revisor).
 - Etapa 7 (parcial, commit intermediário): motor multipasso + 15 efeitos + 25 filtros + 15 transições + velocidade (curva, WSOLA p/ manter tom) + pontos-chave. Testes de imagem: 60/60 estáveis em 2 rodadas (página /render-tests.html; `?update=1` regrava referências).
 - Bugs achados pelos testes de imagem: 'active' é palavra reservada em GLSL ES 3.00; transições 'blur'/'glitch' colidiam com efeitos de mesmo tipo (renomeadas blurCross/glitchCross; agora colisão lança erro + teste); runner lia largura de ImageBitmap fechado (0); fontes não carregadas deixavam a 1ª rodada instável.
 - Lição: referência criada ≠ referência certa — olhar TODAS as imagens (folhas de contato) antes de confiar.
+- ⚠️ Arquivos do OPFS sumiram 2ª vez (pastas ficam, conteúdo some; IndexedDB intacto). Investigação: as partições do navegador embutido do app Claude (~/.config/Claude/Partitions/launch-preview-*) NÃO têm "File System"/IndexedDB em disco → armazenamento só em memória; com muita mídia, o conteúdo é descartado. Não reproduzível por reinício do servidor nem pela página de testes. Conclusão: limitação do ambiente de teste. Mesmo assim (etapa 10): pedir `navigator.storage.persist()` e mostrar "mídia não encontrada — importe de novo/relink" em vez de quadro preto.
+- Etapa 7 passou (revisor rodada 2: PASSA; 1124 testes). Critério: 105 testes de imagem (15 efeitos, 25 filtros, 15 transições, ajustes isolados, HSL por faixa, máscaras com/sem inversão, chroma, velocidades 0,1x–100x e 6 curvas, easings, keyframes de transform e de efeito, congelar, inverter, remover fundo com máscara, combinações) — todos conferidos a olho e estáveis.
+- Verificado pela interface: P&B + VHS + transição Íris aplicados pelas abas e desenhados certo.
+- Prévia preta com o painel escondido = navegador pausa requestAnimationFrame em aba oculta (normal); pra conferir com painel escondido, chamar renderFrame direto.
+- Corrigidos: manter o tom (WSOLA) num worker com cache por trecho; inverter volta ao trecho original após recarregar (Asset.sourceTrimInMs/sourceSpanMs).
+- Pendências p/ etapa 10: restaurar original de clipe invertido que foi dividido/aparado (espelhar trim); reaproveitar cópia invertida existente; AudioBuffer esticado por contexto em WeakMap; reagendar quando o trecho esticado fica pronto; cancelar pedidos de esticamento obsoletos ao arrastar o aparo; limpar assets gerados órfãos; navigator.storage.persist() + aviso de mídia ausente.

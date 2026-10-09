@@ -1,7 +1,8 @@
 // Executor dos testes de render: desenha cada caso com o compositor real e compara com a referência PNG.
 import { createCompositor } from '@/engine/render/compositor';
 import { renderFrame } from '@/engine/render/renderFrame';
-import { RENDER_CASES, type RenderCase } from './cases';
+import { RENDER_CASES } from './allCases';
+import type { RenderCase } from './cases';
 import { compareImages } from './compare';
 import { ensureFont } from '@/engine/text/fontLoader';
 

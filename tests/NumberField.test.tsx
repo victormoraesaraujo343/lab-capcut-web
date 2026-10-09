@@ -68,4 +68,68 @@ describe('NumberField', () => {
     expect(onChange).toHaveBeenNthCalledWith(1, 40, false);
     expect(onChange).toHaveBeenNthCalledWith(2, 40, true);
   });
+
+  it('sem keyframe, não mostra controle de keyframe', () => {
+    render(<NumberField label="Escala" value={50} min={0} max={100} step={1} onChange={vi.fn()} />);
+
+    expect(screen.queryByRole('button', { name: 'Adicionar ponto-chave' })).toBeNull();
+  });
+
+  it('com keyframe no campo, o losango chama onToggle e mostra Adicionar quando não há ponto ali', () => {
+    const onToggle = vi.fn();
+    render(
+      <NumberField
+        label="Escala"
+        value={50}
+        min={0}
+        max={100}
+        step={1}
+        onChange={vi.fn()}
+        keyframe={{ active: false, animated: false, onToggle, onPrev: vi.fn(), onNext: vi.fn() }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Adicionar ponto-chave' }));
+
+    expect(onToggle).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: 'Ponto-chave anterior' })).toBeNull();
+  });
+
+  it('com ponto no cursor, o losango mostra Remover e aria-pressed verdadeiro', () => {
+    render(
+      <NumberField
+        label="Escala"
+        value={50}
+        min={0}
+        max={100}
+        step={1}
+        onChange={vi.fn()}
+        keyframe={{ active: true, animated: true, onToggle: vi.fn(), onPrev: vi.fn(), onNext: vi.fn() }}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Remover ponto-chave' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('campo animado mostra setas que chamam onPrev e onNext', () => {
+    const onPrev = vi.fn();
+    const onNext = vi.fn();
+    render(
+      <NumberField
+        label="Escala"
+        value={50}
+        min={0}
+        max={100}
+        step={1}
+        onChange={vi.fn()}
+        keyframe={{ active: false, animated: true, onToggle: vi.fn(), onPrev, onNext }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ponto-chave anterior' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Próximo ponto-chave' }));
+
+    expect(onPrev).toHaveBeenCalledTimes(1);
+    expect(onNext).toHaveBeenCalledTimes(1);
+  });
 });

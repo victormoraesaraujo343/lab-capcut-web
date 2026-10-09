@@ -10,6 +10,7 @@ import {
   trimToTime,
   updateClip,
 } from '@/engine/timeline/clipOps';
+import type { SpeedCurvePoint } from '@/types';
 
 /** Monta um clipe de teste na trilha 'v1'. */
 function clip(id: string, startMs: number, durationMs: number, extra: Partial<Clip> = {}): Clip {
@@ -248,5 +249,84 @@ describe('trimToTime', () => {
     expect(out[0]?.clips[0]?.durationMs).toBe(3000);
     expect(out[0]?.clips[0]?.trimOutMs).toBe(1000);
     expect(out[0]?.clips[1]).toBe(tracks[0]?.clips[1]);
+  });
+});
+
+/** Velocidade por curva de 1x no início a 3x no fim (mídia total de 2000 ms num clipe de 1000 ms). */
+const RAMP_CURVE: SpeedCurvePoint[] = [
+  { t: 0, speed: 1 },
+  { t: 1, speed: 3 },
+];
+
+/** Clipe de 1000 ms com a curva de rampa acima. */
+function rampClip(id: string, startMs = 0, extra: Partial<Clip> = {}): Clip {
+  return clip(id, startMs, 1000, {
+    speed: { mode: 'curve', value: 1, curve: RAMP_CURVE, preservePitch: true },
+    ...extra,
+  });
+}
+
+/** Pontos de curva com t e velocidade arredondados, para comparar com tolerância. */
+function roundCurve(points: SpeedCurvePoint[]): Array<[number, number]> {
+  return points.map((p): [number, number] => [Math.round(p.t * 1000) / 1000, Math.round(p.speed * 1000) / 1000]);
+}
+
+describe('curva de velocidade nos recortes', () => {
+  it('ao dividir, cada metade recebe a parte da mídia e a curva renormalizada', () => {
+    const tracks = [track('v1', [rampClip('a')])];
+    const { tracks: out, rightId } = splitClipAt(tracks, 'a', 500);
+    const left = out[0]?.clips[0];
+    const right = out[0]?.clips.find((c) => c.id === rightId);
+    expect(left?.durationMs).toBe(500);
+    expect(left?.trimOutMs).toBeCloseTo(1250);
+    expect(roundCurve(left?.speed.curve ?? [])).toEqual([[0, 1], [1, 2]]);
+    expect(right?.trimInMs).toBeCloseTo(750);
+    expect(right?.trimOutMs).toBeCloseTo(0);
+    expect(roundCurve(right?.speed.curve ?? [])).toEqual([[0, 2], [1, 3]]);
+  });
+
+  it('a soma da mídia das duas metades é a mídia do clipe inteiro', () => {
+    const tracks = [track('v1', [rampClip('a')])];
+    const { tracks: out, rightId } = splitClipAt(tracks, 'a', 300);
+    const left = out[0]?.clips[0];
+    const right = out[0]?.clips.find((c) => c.id === rightId);
+    const leftMedia = 2000 - (left?.trimOutMs ?? 0);
+    const rightMedia = 2000 - (right?.trimOutMs ?? 0) - (right?.trimInMs ?? 0);
+    expect(leftMedia + rightMedia).toBeCloseTo(2000);
+  });
+
+  it('aparar o início de um clipe com curva consome a mídia da curva', () => {
+    const tracks = [track('v1', [rampClip('a')])];
+    const out = trimClipStart(tracks, 'a', 500);
+    const c = out[0]?.clips[0];
+    expect(c?.startMs).toBe(500);
+    expect(c?.durationMs).toBe(500);
+    expect(c?.trimInMs).toBeCloseTo(750);
+    expect(roundCurve(c?.speed.curve ?? [])).toEqual([[0, 2], [1, 3]]);
+  });
+
+  it('aparar o fim de um clipe com curva mantém o início da curva', () => {
+    const tracks = [track('v1', [rampClip('a')])];
+    const out = trimClipEnd(tracks, 'a', 500);
+    const c = out[0]?.clips[0];
+    expect(c?.durationMs).toBe(500);
+    expect(c?.trimOutMs).toBeCloseTo(1250);
+    expect(roundCurve(c?.speed.curve ?? [])).toEqual([[0, 1], [1, 2]]);
+  });
+
+  it('estender o início de um clipe com curva respeita a mídia disponível pela curva', () => {
+    const tracks = [track('v1', [rampClip('b', 1000, { trimInMs: 750 })])];
+    const out = trimClipStart(tracks, 'b', 0, 10000);
+    expect(out[0]?.clips[0]?.startMs).toBe(250);
+    expect(out[0]?.clips[0]?.trimInMs).toBeCloseTo(0);
+  });
+
+  it('no modo constante o recorte continua igual ao de antes', () => {
+    const tracks = [track('v1', [clip('a', 0, 1000, { speed: { ...defaultSpeed(), value: 2 } })])];
+    const { tracks: out, rightId } = splitClipAt(tracks, 'a', 400);
+    const right = out[0]?.clips.find((c) => c.id === rightId);
+    expect(out[0]?.clips[0]?.trimOutMs).toBeCloseTo(1200);
+    expect(right?.trimInMs).toBeCloseTo(800);
+    expect(right?.speed.mode).toBe('constant');
   });
 });

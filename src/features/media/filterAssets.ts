@@ -7,10 +7,13 @@ function normalizeText(text: string): string {
   return text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 }
 
-/** Filtra os assets pela pasta (null = todas) e pelo nome, sem diferenciar maiúsculas nem acentos; ordena do mais novo ao mais antigo. */
+/** Filtra os assets pela pasta (null = todas) e pelo nome, sem diferenciar maiúsculas nem acentos; assets gerados (com role) ficam de fora; ordena do mais novo ao mais antigo. */
 export function filterAssets(assets: Asset[], query: string, folderId: string | null): Asset[] {
   const needle = normalizeText(query.trim());
   const matches = assets.filter((asset) => {
+    if (asset.role !== undefined) {
+      return false;
+    }
     if (folderId !== null && asset.folderId !== folderId) {
       return false;
     }

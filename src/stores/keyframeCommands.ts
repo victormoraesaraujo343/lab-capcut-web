@@ -76,11 +76,13 @@ function withPropertyList(clip: Clip, property: string, fn: (list: Keyframe<numb
   return { ...clip, keyframes };
 }
 
-/** Localiza o clipe e devolve o instante local dele para um instante da timeline; null se o clipe não existe. */
+/** Localiza o clipe e devolve o instante local dele para um instante da timeline; null se o clipe não existe ou o instante está fora dele. */
 function localTimeOf(clipId: string, timelineMs: number): number | null {
   const found = findClip(currentTracks(), clipId);
   if (!found) return null;
-  return timelineMs - found.clip.startMs;
+  const localMs = timelineMs - found.clip.startMs;
+  if (localMs < 0 || localMs > found.clip.durationMs) return null;
+  return localMs;
 }
 
 /** Aplica uma mudança nos keyframes de um clipe pela timeline, com coalesceKey opcional. */
@@ -97,7 +99,7 @@ function editClip(label: string, clipId: string, fn: (clip: Clip) => Clip, coale
 export function toggleKeyframe(clipId: string, property: string, atTimelineMs: number, value: number): void {
   const localMs = localTimeOf(clipId, atTimelineMs);
   if (localMs === null) return;
-  editClip('Keyframe', clipId, (clip) =>
+  editClip('keyframe', clipId, (clip) =>
     withPropertyList(clip, property, (list) =>
       hasKeyframeAt(list, localMs)
         ? removeKeyframeAt(list, localMs)
@@ -111,7 +113,7 @@ export function setKeyframeValue(clipId: string, property: string, atTimelineMs:
   const localMs = localTimeOf(clipId, atTimelineMs);
   if (localMs === null) return;
   editClip(
-    'Valor do keyframe',
+    'keyframe-value',
     clipId,
     (clip) =>
       withPropertyList(clip, property, (list) => {
@@ -125,7 +127,7 @@ export function setKeyframeValue(clipId: string, property: string, atTimelineMs:
 
 /** Troca o easing do keyframe no tempo local do clipe (ms relativo ao início do clipe); sem keyframe ali, não faz nada. */
 export function setKeyframeEasing(clipId: string, property: string, timeMs: number, easing: Easing): void {
-  editClip('Curva do keyframe', clipId, (clip) =>
+  editClip('keyframe-easing', clipId, (clip) =>
     withPropertyList(clip, property, (list) =>
       list.map((k) => (hasKeyframeAt([k], timeMs) ? { ...k, easing } : k)),
     ),
@@ -134,14 +136,14 @@ export function setKeyframeEasing(clipId: string, property: string, timeMs: numb
 
 /** Move o keyframe de um tempo local do clipe para outro (ms relativos ao início do clipe). */
 export function moveKeyframeCmd(clipId: string, property: string, fromMs: number, toMs: number): void {
-  editClip('Mover keyframe', clipId, (clip) =>
+  editClip('keyframe-move', clipId, (clip) =>
     withPropertyList(clip, property, (list) => moveKeyframe(list, fromMs, toMs)),
   );
 }
 
 /** Remove todos os keyframes de uma propriedade do clipe. */
 export function clearKeyframes(clipId: string, property: string): void {
-  editClip('Limpar keyframes', clipId, (clip) => {
+  editClip('keyframes-clear', clipId, (clip) => {
     if (clip.keyframes[property] === undefined) return clip;
     return withPropertyList(clip, property, () => []);
   });

@@ -9,13 +9,13 @@ import {
   addEffect,
   addFilter,
   moveEffect,
-  registerFilterPreset,
   removeEffect,
   setFilterIntensity,
   updateEffectParam,
 } from '@/stores/effectCommands';
 import { setKeyframeValue } from '@/stores/keyframeCommands';
 import { registerEffect } from '@/engine/render/registry';
+import { FILTER_PRESETS, presetToFilter } from '@/engine/render/filters/filterPresets';
 import { createProject } from '@/engine/project/createProject';
 import { defaultAudioFx, defaultSpeed, defaultTransform, type Clip, type Project } from '@/types';
 
@@ -130,16 +130,36 @@ describe('effectCommands', () => {
     expect(clipNow().effects[0]?.id).toBe(first);
   });
 
-  it('setFilterIntensity guarda a intensidade e aplica preset × intensidade quando o preset existe', () => {
-    registerFilterPreset('warm', { amount: 0.8, heat: 0.4 });
-    addFilter('c1', { id: 'f1', type: 'brightness', params: { presetId: 'warm', amount: 0.8, heat: 0.4 } });
+  it('setFilterIntensity refaz os parâmetros de cor pelo predefinido de FILTER_PRESETS na intensidade dada', () => {
+    const warm = FILTER_PRESETS.find((p) => p.id === 'warm');
+    expect(warm).toBeDefined();
+    addFilter('c1', { id: 'f1', type: 'colorAdjust', params: { presetId: 'warm', intensity: 1 } });
     setFilterIntensity('c1', 'f1', 0.5);
-    expect(clipNow().filters[0]?.params).toEqual({ presetId: 'warm', amount: 0.4, heat: 0.2, intensity: 0.5 });
+    const expected = presetToFilter('warm', 0.5).params;
+    expect(clipNow().filters[0]?.params).toEqual({ presetId: 'warm', intensity: 0.5, ...expected });
+  });
+
+  it('setFilterIntensity com presetId desconhecido só guarda a intensidade', () => {
+    addFilter('c1', { id: 'f3', type: 'colorAdjust', params: { presetId: 'nao-existe', amount: 0.2 } });
+    setFilterIntensity('c1', 'f3', 0.5);
+    expect(clipNow().filters[0]?.params).toEqual({ presetId: 'nao-existe', amount: 0.2, intensity: 0.5 });
   });
 
   it('setFilterIntensity sem preset guarda só a intensidade, limitada entre 0 e 1', () => {
     addFilter('c1', { id: 'f2', type: 'contrast', params: { amount: 0.3 } });
     setFilterIntensity('c1', 'f2', 3);
     expect(clipNow().filters[0]?.params).toEqual({ amount: 0.3, intensity: 1 });
+  });
+
+  it('updateEffectParam com parâmetro animado não grava com o cursor fora do clipe', () => {
+    addEffect('c1', 'testBlur');
+    const id = clipNow().effects[0]?.id ?? '';
+    setKeyframeValue('c1', `fx:${id}:radius`, 1000, 1);
+    const before = clipNow().keyframes[`fx:${id}:radius`];
+    usePlaybackStore.setState({ currentTimeMs: 500 });
+    updateEffectParam('c1', id, 'radius', 15);
+    usePlaybackStore.setState({ currentTimeMs: 3500 });
+    updateEffectParam('c1', id, 'radius', 15);
+    expect(clipNow().keyframes[`fx:${id}:radius`]).toEqual(before);
   });
 });

@@ -5,6 +5,7 @@ import { useTimelineStore } from '@/stores/timelineStore';
 import type { Clip } from '@/types';
 import { NumberField } from './NumberField';
 import { Section } from './Section';
+import { useKeyframeProperty } from './useKeyframeProperty';
 
 /** Propriedades de AudioSection. */
 export interface AudioSectionProps {
@@ -24,16 +25,26 @@ function editAudio(clipId: string, key: string, change: (clip: Clip) => Clip): v
 
 /** Seção Áudio: volume de 0 a 200% e fades de entrada e saída em milissegundos. */
 export function AudioSection({ clip }: AudioSectionProps) {
+  const volume = useKeyframeProperty(clip.id, 'volume', (raw) =>
+    editAudio(clip.id, 'volume', (c) => ({ ...c, volume: raw })),
+  );
   return (
     <Section title={t.inspector.audio}>
       <NumberField
         label={t.inspector.volume}
-        value={Math.round(clip.volume * 100)}
+        value={Math.round(volume.value * 100)}
         min={0}
         max={200}
         step={1}
         unit={t.inspector.unitPercent}
-        onChange={(value) => editAudio(clip.id, 'volume', (c) => ({ ...c, volume: value / 100 }))}
+        onChange={(value, final) => volume.setValue(value / 100, final)}
+        keyframe={{
+          active: volume.onKeyframe,
+          animated: volume.hasKeyframes,
+          onToggle: volume.toggle,
+          onPrev: volume.prev,
+          onNext: volume.next,
+        }}
       />
       <NumberField
         label={t.inspector.fadeIn}

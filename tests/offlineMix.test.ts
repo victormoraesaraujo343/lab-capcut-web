@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mixProjectAudio, segmentsInRange } from '../src/engine/audio/offlineMix';
-import { scheduleSegment } from '../src/engine/audio/audioNodes';
+import { originalSource, scheduleSegment, stretchedPlaySource } from '../src/engine/audio/audioNodes';
+import { clearStretchedSegments } from '../src/engine/audio/stretchedBufferCache';
+import { stretchChannels } from '../src/engine/audio/stretchClient';
 import { computeSegments } from '../src/engine/audio/audioSchedule';
 import { createPreviewAudioEngine } from '../src/engine/audio/previewAudioEngine';
 import {
@@ -16,6 +18,28 @@ import {
 vi.mock('../src/engine/storage/opfs', () => ({
   readFile: vi.fn(async () => ({ arrayBuffer: async () => new ArrayBuffer(4) })),
 }));
+
+// Worker de esticamento substituído pelo WSOLA na própria thread (o teste não tem Worker).
+vi.mock('../src/engine/audio/stretchClient', async () => {
+  const { wsolaStretch } = await import('../src/engine/audio/timeStretch');
+  return {
+    stretchChannels: vi.fn(async (channels: Float32Array<ArrayBuffer>[], sampleRate: number, rate: number) =>
+      channels.map((channel) => wsolaStretch(channel, sampleRate, rate)),
+    ),
+  };
+});
+
+/** Buffer de áudio falso com dados de verdade (para o corte do trecho esticado). */
+function fakeDecodedBuffer(samples: number, sampleRate: number): AudioBuffer {
+  const data = new Float32Array(samples);
+  return {
+    numberOfChannels: 1,
+    sampleRate,
+    length: samples,
+    duration: samples / sampleRate,
+    getChannelData: () => data,
+  } as unknown as AudioBuffer;
+}
 
 interface FakeSource {
   buffer: unknown;
@@ -56,7 +80,10 @@ class FakeOfflineAudioContext {
   }
   decodeAudioData(): Promise<unknown> {
     this.decodeCalls++;
-    return Promise.resolve({ id: `buffer-${this.decodeCalls}` });
+    return Promise.resolve(fakeDecodedBuffer(4000, 1000));
+  }
+  createBuffer(channels: number, length: number): FakeCreatedBuffer {
+    return createdBufferFake(channels, length);
   }
   createBufferSource(): FakeSource {
     const source: FakeSource = {
@@ -104,6 +131,7 @@ class FakeAudioContext {
   state = 'running';
   destination = {};
   envelopeCalls: EnvelopeCall[] = [];
+  sources: { buffer: unknown; playbackRate: { value: number } }[] = [];
 
   constructor() {
     FakeAudioContext.last = this;
@@ -115,10 +143,13 @@ class FakeAudioContext {
     return Promise.resolve();
   }
   decodeAudioData(): Promise<unknown> {
-    return Promise.resolve({ id: 'preview-buffer' });
+    return Promise.resolve(previewBuffer);
+  }
+  createBuffer(channels: number, length: number): FakeCreatedBuffer {
+    return createdBufferFake(channels, length);
   }
   createBufferSource() {
-    return {
+    const source = {
       buffer: null as unknown,
       playbackRate: { value: 1 },
       connect: () => undefined,
@@ -126,6 +157,8 @@ class FakeAudioContext {
       start: () => undefined,
       stop: () => undefined,
     };
+    this.sources.push(source);
+    return source;
   }
   createGain() {
     const calls = this.envelopeCalls;
@@ -148,10 +181,35 @@ class FakeAudioContext {
 vi.stubGlobal('OfflineAudioContext', FakeOfflineAudioContext);
 vi.stubGlobal('AudioContext', FakeAudioContext);
 
+/** Buffer decodificado falso da prévia: 2 s a 1 kHz, mono, com amostras reais. */
+const previewBuffer = fakeDecodedBuffer(2000, 1000);
+
+/** Buffer criado por createBuffer nos contextos falsos: registra os canais copiados. */
+interface FakeCreatedBuffer {
+  channels: number;
+  length: number;
+  data: Float32Array[];
+  copyToChannel: (data: Float32Array, channel: number) => void;
+}
+
+function createdBufferFake(channels: number, length: number): FakeCreatedBuffer {
+  const entry: FakeCreatedBuffer = {
+    channels,
+    length,
+    data: [],
+    copyToChannel: (data, channel) => {
+      entry.data[channel] = data;
+    },
+  };
+  return entry;
+}
+
 afterEach(() => {
   FakeOfflineAudioContext.last = null;
   FakeOfflineAudioContext.renderCalls = 0;
   FakeAudioContext.last = null;
+  clearStretchedSegments();
+  vi.mocked(stretchChannels).mockClear();
 });
 
 /** Espera as promessas pendentes do motor da prévia (carga de buffer e agendamento). */
@@ -465,7 +523,7 @@ describe('velocidade no nó de áudio (scheduleSegment)', () => {
     const node = scheduleSegment(
       ctx as unknown as BaseAudioContext,
       {} as AudioNode,
-      buffer,
+      originalSource(buffer),
       clip,
       segmentOf(clip, 250),
       0,
@@ -480,7 +538,7 @@ describe('velocidade no nó de áudio (scheduleSegment)', () => {
     expect(source?.stopAt).toBeCloseTo(0.75, 9);
   });
 
-  it('velocidade constante mantendo o tom usa o buffer esticado e taxa residual 1', () => {
+  it('velocidade constante mantendo o tom usa o trecho esticado e taxa residual 1', async () => {
     const clip = makeClip({
       id: 'n2',
       trackId: 't1',
@@ -489,13 +547,14 @@ describe('velocidade no nó de áudio (scheduleSegment)', () => {
     });
     const ctx = new FakeNodeContext();
     const buffer = sourceBuffer(2000, 1000);
-    scheduleSegment(ctx as unknown as BaseAudioContext, {} as AudioNode, buffer, clip, segmentOf(clip, 250), 0);
+    const playable = await stretchedPlaySource(ctx as unknown as BaseAudioContext, makeAsset('a1', 'audio'), buffer, clip);
+    scheduleSegment(ctx as unknown as BaseAudioContext, {} as AudioNode, playable, clip, segmentOf(clip, 250), 0);
     const [source] = ctx.sources;
     expect(ctx.createdBuffers).toHaveLength(1);
     expect(ctx.createdBuffers[0]?.length).toBe(1000);
     expect(source?.buffer).not.toBe(buffer);
     expect(source?.playbackRate.value).toBe(1);
-    // A mídia de 500 ms (250 ms x 2) cai em 250 ms do buffer esticado.
+    // A mídia de 500 ms (250 ms x 2) cai em 250 ms do trecho esticado.
     expect(source?.started?.offset).toBeCloseTo(0.25, 9);
   });
 
@@ -518,7 +577,7 @@ describe('velocidade no nó de áudio (scheduleSegment)', () => {
     scheduleSegment(
       ctx as unknown as BaseAudioContext,
       {} as AudioNode,
-      sourceBuffer(2000, 1000),
+      originalSource(sourceBuffer(2000, 1000)),
       clip,
       segmentOf(clip),
       0,
@@ -554,8 +613,9 @@ describe('velocidade no nó de áudio (scheduleSegment)', () => {
     });
     const ctx = new FakeNodeContext();
     const buffer = sourceBuffer(2000, 1000);
-    expect(scheduleSegment(ctx as unknown as BaseAudioContext, {} as AudioNode, buffer, fast, segmentOf(fast), 0)).toBeNull();
-    expect(scheduleSegment(ctx as unknown as BaseAudioContext, {} as AudioNode, buffer, slow, segmentOf(slow), 0)).toBeNull();
+    const source = originalSource(buffer);
+    expect(scheduleSegment(ctx as unknown as BaseAudioContext, {} as AudioNode, source, fast, segmentOf(fast), 0)).toBeNull();
+    expect(scheduleSegment(ctx as unknown as BaseAudioContext, {} as AudioNode, source, slow, segmentOf(slow), 0)).toBeNull();
     expect(ctx.sources).toHaveLength(0);
   });
 
@@ -594,5 +654,66 @@ describe('volume por keyframe na mixagem offline', () => {
       { op: 'linearRampToValueAtTime', value: 1, when: 0.5 },
       { op: 'linearRampToValueAtTime', value: 1.5, when: 1 },
     ]);
+  });
+});
+
+describe('trecho esticado no caminho de exportação e de prévia', () => {
+  it('a mixagem offline espera o trecho esticado antes de agendar a fonte', async () => {
+    const clip = makeClip({
+      id: 'w1',
+      trackId: 't1',
+      durationMs: 1000,
+      speed: { mode: 'constant', value: 2, curve: [], preservePitch: true },
+    });
+    const project = makeProject([makeTrack({ id: 't1', kind: 'audio', clips: [clip] })], [makeAsset('a1', 'audio')]);
+    let release: (channels: Float32Array<ArrayBuffer>[]) => void = () => undefined;
+    vi.mocked(stretchChannels).mockImplementationOnce(
+      () => new Promise<Float32Array<ArrayBuffer>[]>((resolve) => {
+        release = resolve;
+      }),
+    );
+
+    const promise = mixProjectAudio(project, 0, 1000, { sampleRate: 1000 });
+    await flushPromises();
+    expect(FakeOfflineAudioContext.last?.sources).toHaveLength(0);
+    expect(FakeOfflineAudioContext.renderCalls).toBe(0);
+
+    release([new Float32Array(500)]);
+    await promise;
+    const ctx = FakeOfflineAudioContext.last;
+    expect(ctx?.sources).toHaveLength(1);
+    const [source] = ctx?.sources ?? [];
+    expect(source?.playbackRate.value).toBe(1);
+    expect(source?.started).toEqual({ when: 0, offset: 0 });
+    expect((source?.buffer as { length: number } | undefined)?.length).toBe(1000);
+    expect(FakeOfflineAudioContext.renderCalls).toBe(1);
+    expect(vi.mocked(stretchChannels)).toHaveBeenCalledTimes(1);
+  });
+
+  it('a prévia toca na velocidade comum enquanto o trecho não está pronto e usa o esticado depois', async () => {
+    const clip = makeClip({
+      id: 'p1',
+      trackId: 't1',
+      durationMs: 1000,
+      speed: { mode: 'constant', value: 2, curve: [], preservePitch: true },
+    });
+    const project = makeProject([makeTrack({ id: 't1', kind: 'audio', clips: [clip] })], [makeAsset('a1', 'audio')]);
+    const engine = createPreviewAudioEngine();
+
+    await engine.play(project, 0);
+    await flushPromises();
+    const context = FakeAudioContext.last;
+    const first = context?.sources[0];
+    expect(first?.playbackRate.value).toBe(2);
+    expect(first?.buffer).toBe(previewBuffer);
+    expect(vi.mocked(stretchChannels)).toHaveBeenCalledTimes(1);
+
+    await flushPromises();
+    engine.reschedule(project);
+    await flushPromises();
+    const latest = context?.sources[context.sources.length - 1];
+    expect(latest?.playbackRate.value).toBe(1);
+    expect(latest?.buffer).not.toBe(previewBuffer);
+    engine.dispose();
   });
 });

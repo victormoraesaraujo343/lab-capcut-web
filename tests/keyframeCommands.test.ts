@@ -108,4 +108,18 @@ describe('keyframeCommands', () => {
     useTimelineStore.getState().undo();
     expect(clipNow().keyframes['x']).toBeUndefined();
   });
+
+  it('toggleKeyframe e setKeyframeValue não gravam com o cursor antes ou depois do clipe', () => {
+    toggleKeyframe('c1', 'x', 500, 1);
+    toggleKeyframe('c1', 'x', 3500, 1);
+    setKeyframeValue('c1', 'x', 500, 2);
+    setKeyframeValue('c1', 'x', 3500, 2);
+    expect(clipNow().keyframes['x']).toBeUndefined();
+  });
+
+  it('o instante exatamente no início ou no fim do clipe ainda grava', () => {
+    toggleKeyframe('c1', 'x', 1000, 1);
+    toggleKeyframe('c1', 'x', 3000, 2);
+    expect(clipNow().keyframes['x']?.map((k) => k.timeMs)).toEqual([0, 2000]);
+  });
 });

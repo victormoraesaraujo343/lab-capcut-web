@@ -2,6 +2,7 @@
 import type { Clip, EffectInstance, ParamValue, Track } from '@/types';
 import { upsertKeyframe } from '@/engine/render/keyframes';
 import { defaultParams, getEffect } from '@/engine/render/registry';
+import { FILTER_PRESETS, presetToFilter } from '@/engine/render/filters/filterPresets';
 import { createId } from '@/engine/project/createProject';
 import { findClip, updateClip } from '@/engine/timeline/clipOps';
 import { useProjectStore } from './projectStore';
@@ -14,14 +15,6 @@ const DEFAULT_EASING = 'easeInOut';
 /** Intensidade mínima e máxima de um filtro (fração do preset). */
 const INTENSITY_MIN = 0;
 const INTENSITY_MAX = 1;
-
-/** Valores numéricos de cada predefinição de filtro, indexados pelo id do predefinido. */
-const filterPresets = new Map<string, Record<string, number>>();
-
-/** Cadastra os valores numéricos de um predefinido de filtro, usados por setFilterIntensity. */
-export function registerFilterPreset(presetId: string, values: Record<string, number>): void {
-  filterPresets.set(presetId, { ...values });
-}
 
 /** Trilhas do projeto aberto, ou lista vazia. */
 function currentTracks(): Track[] {
@@ -49,14 +42,14 @@ function mapInstance(clip: Clip, instanceId: string, fn: (inst: EffectInstance) 
 
 /** Adiciona um filtro ao fim da lista de filtros do clipe. */
 export function addFilter(clipId: string, filter: EffectInstance): void {
-  editClip('Adicionar filtro', clipId, (clip) => ({ ...clip, filters: [...clip.filters, { ...filter }] }));
+  editClip('filter-add', clipId, (clip) => ({ ...clip, filters: [...clip.filters, { ...filter }] }));
 }
 
 /** Adiciona um efeito ao fim da lista de efeitos do clipe, com os parâmetros padrão do tipo; tipo desconhecido não faz nada. */
 export function addEffect(clipId: string, type: string): void {
   if (getEffect(type) === undefined) return;
   const instance: EffectInstance = { id: createId(), type, params: defaultParams(type) };
-  editClip('Adicionar efeito', clipId, (clip) => ({ ...clip, effects: [...clip.effects, instance] }));
+  editClip('effect-add', clipId, (clip) => ({ ...clip, effects: [...clip.effects, instance] }));
 }
 
 /**
@@ -70,8 +63,10 @@ export function updateEffectParam(clipId: string, instanceId: string, key: strin
   const list = found.clip.keyframes[property];
   const animated = list !== undefined && list.length > 0 && typeof value === 'number';
   const localMs = usePlaybackStore.getState().currentTimeMs - found.clip.startMs;
+  // Com keyframe, só grava se o cursor estiver dentro do clipe.
+  if (animated && (localMs < 0 || localMs > found.clip.durationMs)) return;
   editClip(
-    'Parâmetro do efeito',
+    'effect-param',
     clipId,
     (clip) => {
       if (animated) {
@@ -88,7 +83,7 @@ export function updateEffectParam(clipId: string, instanceId: string, key: strin
 
 /** Remove um filtro ou efeito do clipe, junto com os keyframes dos seus parâmetros. */
 export function removeEffect(clipId: string, instanceId: string): void {
-  editClip('Remover efeito', clipId, (clip) => {
+  editClip('effect-remove', clipId, (clip) => {
     const prefix = `fx:${instanceId}:`;
     const keyframes = Object.fromEntries(Object.entries(clip.keyframes).filter(([prop]) => !prop.startsWith(prefix)));
     return {
@@ -102,7 +97,7 @@ export function removeEffect(clipId: string, instanceId: string): void {
 
 /** Move um filtro ou efeito para a posição dada na sua lista (índice limitado ao tamanho da lista). */
 export function moveEffect(clipId: string, instanceId: string, toIndex: number): void {
-  editClip('Reordenar efeito', clipId, (clip) => {
+  editClip('effect-reorder', clipId, (clip) => {
     const moveIn = (list: EffectInstance[]): EffectInstance[] => {
       const from = list.findIndex((inst) => inst.id === instanceId);
       if (from < 0) return list;
@@ -116,21 +111,23 @@ export function moveEffect(clipId: string, instanceId: string, toIndex: number):
   });
 }
 
+/** Diz se o id é de um filtro pronto de FILTER_PRESETS. */
+function isKnownPreset(presetId: string): boolean {
+  return FILTER_PRESETS.some((preset) => preset.id === presetId);
+}
+
 /**
- * Ajusta a intensidade de um filtro (0 a 1). Se o filtro guarda presetId e o predefinido está cadastrado,
- * cada parâmetro numérico do predefinido vira valor × intensidade.
+ * Ajusta a intensidade de um filtro (0 a 1). Se o filtro guarda um presetId de FILTER_PRESETS, os parâmetros
+ * de cor voltam a ser os do predefinido na intensidade dada; os demais parâmetros e o presetId ficam.
  */
 export function setFilterIntensity(clipId: string, instanceId: string, intensity: number): void {
   const clamped = Math.min(INTENSITY_MAX, Math.max(INTENSITY_MIN, intensity));
-  editClip('Intensidade do filtro', clipId, (clip) =>
+  editClip('filter-intensity', clipId, (clip) =>
     mapInstance(clip, instanceId, (inst) => {
       const presetId = inst.params['presetId'];
-      const preset = typeof presetId === 'string' ? filterPresets.get(presetId) : undefined;
       const params: Record<string, ParamValue> = { ...inst.params, intensity: clamped };
-      if (preset) {
-        for (const [key, base] of Object.entries(preset)) {
-          params[key] = base * clamped;
-        }
+      if (typeof presetId === 'string' && isKnownPreset(presetId)) {
+        Object.assign(params, presetToFilter(presetId, clamped).params);
       }
       return { ...inst, params };
     }),

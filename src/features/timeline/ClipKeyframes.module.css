@@ -1,0 +1,39 @@
+/* Losangos de keyframe no rodapé do clipe: faixa sem toque e um losango clicável por instante. */
+
+.track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 12px;
+  pointer-events: none;
+}
+
+.diamond {
+  position: absolute;
+  bottom: 2px;
+  width: 7px;
+  height: 7px;
+  margin-left: -3.5px;
+  background: var(--on-clip);
+  border: 1px solid var(--accent);
+  transform: rotate(45deg);
+  box-sizing: border-box;
+  pointer-events: auto;
+  cursor: ew-resize;
+  z-index: 1;
+}
+
+.diamond:hover {
+  background: var(--accent);
+}
+
+.moving {
+  background: var(--accent);
+  box-shadow: 0 0 0 1px var(--on-clip);
+}
+
+.readOnly {
+  cursor: default;
+  opacity: 0.6;
+}

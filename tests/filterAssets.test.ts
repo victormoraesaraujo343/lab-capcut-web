@@ -58,4 +58,16 @@ describe('filterAssets', () => {
     filterAssets(assets, '', null);
     expect(assets.map((asset) => asset.id)).toEqual(before);
   });
+
+  it('esconde assets gerados (com role), mesmo sem filtro e na pasta deles', () => {
+    const withRoles: Asset[] = [
+      ...assets,
+      { ...makeAsset('m1', 'Praia recorte.png', 500, 'f1'), role: 'matte' },
+      { ...makeAsset('r1', 'Entrevista invertida.mov', 400), role: 'reversed' },
+      { ...makeAsset('p1', 'Entrevista proxy.mov', 350), role: 'proxy' },
+    ];
+    expect(filterAssets(withRoles, '', null).map((asset) => asset.id)).toEqual(['a2', 'a3', 'a1', 'a4']);
+    expect(filterAssets(withRoles, 'praia', 'f1').map((asset) => asset.id)).toEqual(['a1']);
+    expect(filterAssets(withRoles, 'entrevista', null).map((asset) => asset.id)).toEqual(['a2']);
+  });
 });

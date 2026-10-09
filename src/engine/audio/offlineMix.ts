@@ -1,10 +1,10 @@
 // Mixagem offline do áudio do projeto para exportação: renderiza os mesmos trechos e fades da prévia.
-// Roda na thread principal, pois OfflineAudioContext não existe em worker.
+// Roda na thread principal (OfflineAudioContext não existe em worker); o esticamento de tom vai ao worker.
 
 import type { MixedAudio } from '../../types/export';
-import type { Clip, Project } from '../../types/project';
+import type { Asset, Clip, Project } from '../../types/project';
 import { createAudioBufferCache } from './audioBufferCache';
-import { scheduleSegment } from './audioNodes';
+import { scheduleSegment, stretchedPlaySource, type PlaySource } from './audioNodes';
 import { computeSegments, type ScheduledSegment } from './audioSchedule';
 
 /** Taxa de amostragem padrão da mixagem, em Hz. */
@@ -55,14 +55,15 @@ export async function mixProjectAudio(
   const buffers = await decodeSegmentBuffers(ctx, project, segments);
   throwIfAborted(signal);
   onProgress?.(0.5);
-  throwIfAborted(signal);
   const clips = indexClips(project);
+  const sources = await resolvePlaySources(ctx, project, segments, buffers, clips);
+  throwIfAborted(signal);
   for (const segment of segments) {
-    const buffer = buffers.get(segment.assetId) ?? null;
+    const source = sources.get(segment.clipId);
     const clip = clips.get(segment.clipId);
-    if (buffer !== null && clip !== undefined) {
+    if (source !== undefined && clip !== undefined) {
       const when = (segment.startAtTimelineMs - startMs) / 1000;
-      scheduleSegment(ctx, ctx.destination, buffer, clip, segment, when);
+      scheduleSegment(ctx, ctx.destination, source, clip, segment, when);
     }
   }
   const rendered = await ctx.startRendering();
@@ -73,6 +74,28 @@ export async function mixProjectAudio(
     channels.push(rendered.getChannelData(channel).slice());
   }
   return { sampleRate, channels };
+}
+
+/** Espera os trechos esticados de cada clipe (no worker) e devolve a fonte pronta por id de clipe. */
+async function resolvePlaySources(
+  ctx: OfflineAudioContext,
+  project: Project,
+  segments: ScheduledSegment[],
+  buffers: Map<string, AudioBuffer | null>,
+  clips: Map<string, Clip>,
+): Promise<Map<string, PlaySource>> {
+  const assets = new Map<string, Asset>(project.assets.map((asset) => [asset.id, asset] as const));
+  const sources = new Map<string, PlaySource>();
+  await Promise.all(
+    segments.map(async (segment) => {
+      const buffer = buffers.get(segment.assetId) ?? null;
+      const clip = clips.get(segment.clipId);
+      const asset = assets.get(segment.assetId);
+      if (buffer === null || clip === undefined || asset === undefined) return;
+      sources.set(segment.clipId, await stretchedPlaySource(ctx, asset, buffer, clip));
+    }),
+  );
+  return sources;
 }
 
 /** Decodifica, uma única vez por asset, os buffers usados pelos trechos. */

@@ -20,9 +20,16 @@ export interface FboPool {
   release(entry: FboEntry): void;
   /** Devolve ao pool o framebuffer cuja textura é a dada; não faz nada se a textura não estiver em uso. */
   releaseTexture(texture: WebGLTexture): void;
+  /** Apaga os framebuffers livres (ex.: o compositor chama ao mudar o tamanho de saída). Os em uso não são tocados. */
+  trim(): void;
   /** Apaga todos os framebuffers e texturas do pool. */
   dispose(): void;
 }
+
+/** Máximo de framebuffers livres guardados por tamanho; o excedente é apagado ao ser devolvido. */
+const MAX_FREE_PER_SIZE = 4;
+/** Máximo de framebuffers livres guardados no total, somando todos os tamanhos. */
+const MAX_FREE_TOTAL = 24;
 
 /** Chave de tamanho usada para agrupar framebuffers livres. */
 function sizeKey(width: number, height: number): string {
@@ -55,15 +62,29 @@ function createEntry(gl: WebGL2RenderingContext, width: number, height: number):
 export function createFboPool(gl: WebGL2RenderingContext): FboPool {
   const free = new Map<string, FboEntry[]>();
   const busy = new Map<WebGLTexture, FboEntry>();
-  const all: FboEntry[] = [];
+  const all = new Set<FboEntry>();
+  let freeCount = 0;
 
+  // Apaga o framebuffer e a textura de uma entrada que não está na lista de livres.
+  const destroy = (entry: FboEntry): void => {
+    gl.deleteFramebuffer(entry.framebuffer);
+    gl.deleteTexture(entry.texture);
+    all.delete(entry);
+  };
+
+  // Devolve a entrada ao pool; guarda como livre só até os limites, senão apaga.
   const release = (entry: FboEntry): void => {
     if (!busy.has(entry.texture)) return;
     busy.delete(entry.texture);
     const key = sizeKey(entry.width, entry.height);
-    const list = free.get(key);
-    if (list) list.push(entry);
-    else free.set(key, [entry]);
+    const list = free.get(key) ?? [];
+    if (list.length >= MAX_FREE_PER_SIZE || freeCount >= MAX_FREE_TOTAL) {
+      destroy(entry);
+      return;
+    }
+    list.push(entry);
+    free.set(key, list);
+    freeCount += 1;
   };
 
   return {
@@ -71,8 +92,9 @@ export function createFboPool(gl: WebGL2RenderingContext): FboPool {
       const w = Math.max(1, Math.round(width));
       const h = Math.max(1, Math.round(height));
       const reused = free.get(sizeKey(w, h))?.pop();
+      if (reused) freeCount -= 1;
       const entry = reused ?? createEntry(gl, w, h);
-      if (!reused) all.push(entry);
+      if (!reused) all.add(entry);
       busy.set(entry.texture, entry);
       return entry;
     },
@@ -81,14 +103,22 @@ export function createFboPool(gl: WebGL2RenderingContext): FboPool {
       const entry = busy.get(texture);
       if (entry) release(entry);
     },
+    trim(): void {
+      for (const list of free.values()) {
+        for (const entry of list) destroy(entry);
+      }
+      free.clear();
+      freeCount = 0;
+    },
     dispose(): void {
       for (const entry of all) {
         gl.deleteFramebuffer(entry.framebuffer);
         gl.deleteTexture(entry.texture);
       }
-      all.length = 0;
+      all.clear();
       free.clear();
       busy.clear();
+      freeCount = 0;
     },
   };
 }

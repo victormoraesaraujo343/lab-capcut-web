@@ -11,6 +11,7 @@ import { usePlaybackStore } from '@/stores/playbackStore';
 import { useTimelineStore } from '@/stores/timelineStore';
 import { TRACK_ROW_HEIGHT, TRIM_HANDLE_WIDTH } from './layout';
 import { clipLeftPx, clipWidthPx, visibleClipRange } from './clipGeometry';
+import { ClipKeyframes } from './ClipKeyframes';
 import { ClipThumbnails } from './ClipThumbnails';
 import { ClipWaveform } from './ClipWaveform';
 import { useClipDrag } from './useClipDrag';
@@ -193,6 +194,7 @@ export const ClipView = memo(function ClipView({
           />
         </>
       ) : null}
+      <ClipKeyframes clip={shown} zoom={zoom} locked={locked} />
       {blade && bladeX !== null ? <div className={styles.bladeLine} style={{ left: bladeX }} /> : null}
     </div>
   );

@@ -15,6 +15,10 @@ export interface Asset {
   role?: 'matte' | 'reversed' | 'proxy';
   /** Para assets gerados: o asset de origem. */
   sourceAssetId?: string;
+  /** Para assets gerados a partir de um trecho (ex.: cópia invertida): início do trecho na mídia de origem, em ms. */
+  sourceTrimInMs?: number;
+  /** Para assets gerados a partir de um trecho: duração do trecho na mídia de origem, em ms. */
+  sourceSpanMs?: number;
   /** Nome original do arquivo. */
   name: string;
   /** Tipo MIME do arquivo (ex.: 'video/mp4'). */

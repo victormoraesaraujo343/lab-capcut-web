@@ -38,7 +38,9 @@ describe('presetToFilter', () => {
     const b = presetToFilter('warm', 1);
     expect(a.type).toBe(COLOR_ADJUST_TYPE);
     expect(a.id).not.toBe(b.id);
-    expect(Object.keys(a.params).sort()).toEqual(COLOR_ADJUST_PARAMS.map((p) => p.key).sort());
+    expect(Object.keys(a.params).sort()).toEqual([...COLOR_ADJUST_PARAMS.map((p) => p.key), 'intensity', 'presetId'].sort());
+    expect(a.params['presetId']).toBe('warm');
+    expect(a.params['intensity']).toBe(1);
   });
 
   it('intensidade 0 devolve os valores neutros', () => {

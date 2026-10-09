@@ -79,7 +79,8 @@ function buildParams(values: Partial<Record<string, number>>, intensity: number)
 
 /** Cria a instância de filtro (colorAdjust, id novo) para aplicar um filtro pronto na intensidade dada (0..1). */
 export function presetToFilter(id: string, intensity = 1): EffectInstance {
-  const params: Record<string, ParamValue> = buildParams(findPreset(id).params, intensity);
+  // presetId e intensity ficam guardados no filtro: permitem trocar o predefinido e mudar a intensidade depois de recarregar.
+  const params: Record<string, ParamValue> = { ...buildParams(findPreset(id).params, intensity), presetId: id, intensity };
   return { id: crypto.randomUUID(), type: COLOR_ADJUST_TYPE, params };
 }
 

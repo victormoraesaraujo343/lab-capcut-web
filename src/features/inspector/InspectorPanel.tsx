@@ -1,4 +1,4 @@
-// Painel de Propriedades: mostra as seções do clipe selecionado (texto, transformação ou áudio).
+// Painel de Propriedades: mostra as seções do clipe selecionado (texto, ou abas de mídia: básico, filtros, efeitos, velocidade e ferramentas).
 import { useState, type ReactNode } from 'react';
 import { SlidersHorizontal } from 'lucide-react';
 import { PanelShell } from '@/features/layout/PanelShell';
@@ -8,12 +8,29 @@ import { useProjectStore } from '@/stores/projectStore';
 import { useTimelineStore } from '@/stores/timelineStore';
 import type { Clip, Project, TextData } from '@/types';
 import { AudioSection } from './AudioSection';
+import { ClipToolsSection } from './ClipToolsSection';
+import { EffectsSection } from './EffectsSection';
+import { FiltersSection } from './FiltersSection';
+import { SpeedSection } from './SpeedSection';
 import { TextAnimationSection } from './TextAnimationSection';
 import { TextContentSection } from './TextContentSection';
 import { TextPresetGrid } from './TextPresetGrid';
 import { TextStyleSection } from './TextStyleSection';
 import { TransformSection } from './TransformSection';
+import { TransitionSection } from './TransitionSection';
 import styles from './InspectorPanel.module.css';
+
+/** Abas do inspetor de clipes de mídia (vídeo, imagem e áudio). */
+type MediaTab = 'basic' | 'filters' | 'effects' | 'speed' | 'tools';
+
+/** Abas de mídia na ordem da tela; cada uma aparece só para os tipos de clipe que a usam. */
+const MEDIA_TABS: ReadonlyArray<{ id: MediaTab; label: string }> = [
+  { id: 'basic', label: t.inspector.tabBasic },
+  { id: 'filters', label: t.inspector.tabFilters },
+  { id: 'effects', label: t.inspector.tabEffects },
+  { id: 'speed', label: t.inspector.tabSpeed },
+  { id: 'tools', label: t.inspector.tabTools },
+];
 
 /** Abas do inspetor de texto. */
 type TextTab = 'text' | 'animation' | 'transform';
@@ -82,11 +99,70 @@ function TextClipBody({
   );
 }
 
+/** Propriedades de MediaClipBody. */
+interface MediaClipBodyProps {
+  project: Project;
+  clip: Clip;
+  /** Clipe com imagem ou vídeo na tela (não é só áudio). */
+  visual: boolean;
+  /** Clipe com som (vídeo ou áudio). */
+  hasSound: boolean;
+  tab: MediaTab;
+  onTab: (tab: MediaTab) => void;
+}
+
+/** Abas de um clipe de mídia e o conteúdo da aba escolhida; abas sem sentido para o tipo somem. */
+function MediaClipBody({ project, clip, visual, hasSound, tab, onTab }: MediaClipBodyProps) {
+  const tabs = MEDIA_TABS.filter((item) => {
+    if (item.id === 'speed') return hasSound;
+    if (item.id === 'basic') return true;
+    return visual;
+  });
+  const current = tabs.some((item) => item.id === tab) ? tab : 'basic';
+
+  return (
+    <>
+      <div
+        className={styles.tabs}
+        role="tablist"
+        style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}
+      >
+        {tabs.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            role="tab"
+            className={styles.tab}
+            aria-selected={current === item.id}
+            onClick={() => onTab(item.id)}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+      <div role="tabpanel" className={styles.content}>
+        {current === 'basic' && (
+          <>
+            {visual && <TransformSection clip={clip} canvas={{ width: project.width, height: project.height }} />}
+            {hasSound && <AudioSection clip={clip} />}
+            {clip.transitionOut !== undefined && <TransitionSection clip={clip} />}
+          </>
+        )}
+        {current === 'filters' && <FiltersSection clip={clip} />}
+        {current === 'effects' && <EffectsSection clip={clip} />}
+        {current === 'speed' && <SpeedSection clip={clip} />}
+        {current === 'tools' && <ClipToolsSection clip={clip} />}
+      </div>
+    </>
+  );
+}
+
 /** Painel de Propriedades: com um clipe selecionado mostra as seções adequadas ao tipo dele. */
 export function InspectorPanel() {
   const project = useProjectStore((s) => s.project);
   const selectedIds = useTimelineStore((s) => s.selectedClipIds);
   const [tab, setTab] = useState<TextTab>('text');
+  const [mediaTab, setMediaTab] = useState<MediaTab>('basic');
 
   const [onlyId] = selectedIds;
   const found =
@@ -100,15 +176,18 @@ export function InspectorPanel() {
     const asset = project.assets.find((item) => item.id === clip.assetId);
     const audioOnly = track.kind === 'audio' || asset?.kind === 'audio';
     const hasSound = audioOnly || asset?.kind === 'video';
-    const canvas = { width: project.width, height: project.height };
     body =
       clip.text !== undefined ? (
         <TextClipBody project={project} clip={clip} text={clip.text} tab={tab} onTab={setTab} />
       ) : (
-        <div className={styles.content}>
-          {!audioOnly && <TransformSection clip={clip} canvas={canvas} />}
-          {hasSound && <AudioSection clip={clip} />}
-        </div>
+        <MediaClipBody
+          project={project}
+          clip={clip}
+          visual={!audioOnly}
+          hasSound={hasSound}
+          tab={mediaTab}
+          onTab={setMediaTab}
+        />
       );
   }
 

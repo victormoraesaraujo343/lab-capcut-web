@@ -1,0 +1,43 @@
+/* Controle de keyframe ao lado de um campo: losango central com setas discretas dos dois lados. */
+
+.group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+}
+
+.diamond,
+.nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 20px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.diamond {
+  width: 18px;
+}
+
+.nav {
+  width: 14px;
+}
+
+.diamond:hover,
+.nav:hover {
+  color: var(--text);
+}
+
+.on {
+  color: var(--accent);
+}
+
+.diamond:focus-visible,
+.nav:focus-visible {
+  outline: 1px solid var(--focus-ring);
+  outline-offset: 0;
+}

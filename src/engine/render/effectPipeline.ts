@@ -126,7 +126,14 @@ export function applyLayerEffects(
       const passes = Math.max(1, step.def.passes ?? 1);
       for (let pass = 0; pass < passes; pass += 1) {
         const target = pool.acquire(pw, ph);
-        runPass(gl, programs, step, owned.texture, target, timeSec, pass, matte);
+        let ran = false;
+        try {
+          runPass(gl, programs, step, owned.texture, target, timeSec, pass, matte);
+          ran = true;
+        } finally {
+          // Se o passe lançou, o alvo volta ao pool (a entrada anterior é liberada pelo catch externo).
+          if (!ran) pool.release(target);
+        }
         pool.release(owned);
         owned = target;
       }

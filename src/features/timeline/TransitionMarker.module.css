@@ -1,0 +1,64 @@
+/* Marcador de transição no corte: bloco com a janela da transição, alvo pontilhado de soltura e botão de remover. */
+
+.set {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  z-index: 3;
+  box-sizing: border-box;
+  min-width: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent) 35%, var(--bg-panel-alt));
+  color: var(--text);
+  cursor: pointer;
+  overflow: hidden;
+  user-select: none;
+}
+
+.selected {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: var(--bg-panel);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.set:hover .remove,
+.set:focus-within .remove {
+  display: flex;
+}
+
+.target {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  z-index: 4;
+  box-sizing: border-box;
+  border: 2px dashed var(--accent);
+  border-radius: 4px;
+  background: transparent;
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+.targetHover {
+  opacity: 1;
+  background: color-mix(in srgb, var(--accent) 40%, transparent);
+}

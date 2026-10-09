@@ -1,0 +1,26 @@
+.applyAll {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  height: 32px;
+  box-sizing: border-box;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+.applyAll:hover {
+  background: var(--bg-hover);
+}
+
+.applyAll:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}

@@ -104,8 +104,12 @@ function drawFrame(
   options: CompositeOptions,
   canvas: HTMLCanvasElement | OffscreenCanvas,
 ): void {
-  if (canvas.width !== options.width) canvas.width = options.width;
-  if (canvas.height !== options.height) canvas.height = options.height;
+  if (canvas.width !== options.width || canvas.height !== options.height) {
+    // Tamanho de saída mudou (zoom/qualidade da prévia): framebuffers livres do tamanho antigo não servem mais.
+    res.pool.trim();
+    canvas.width = options.width;
+    canvas.height = options.height;
+  }
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   gl.viewport(0, 0, options.width, options.height);
   const [r, g, b] = parseHexColor(options.background);

@@ -1,3 +1,11 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
 .tablist {
   display: flex;
   align-items: stretch;

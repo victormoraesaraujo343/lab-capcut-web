@@ -162,7 +162,7 @@ export function MediaPanel({ embedded = false }: MediaPanelProps) {
 
           <ImportStatus progress={importProgress} errors={importErrors} onDismiss={dismissImportError} />
 
-          {project.assets.length === 0 ? (
+          {!project.assets.some((asset) => asset.role === undefined) ? (
             <div className={styles.empty}>
               <Film size={32} strokeWidth={1.5} aria-hidden="true" />
               <p className={styles.emptyText}>{t.media.empty}</p>

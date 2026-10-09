@@ -19,3 +19,6 @@ export * from './keyframeCommands';
 export * from './effectCommands';
 export { setClipSpeed, setSpeedCurve, applySpeedPreset, setPreservePitch } from './speedCommands';
 export * from './jobsStore';
+export * from './stabilizeCommands';
+export * from './clipToolCommands';
+export * from './removeBackgroundCommands';

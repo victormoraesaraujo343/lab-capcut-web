@@ -4,6 +4,7 @@ import type { Clip, Keyframe, KeyframeMap, Track } from '@/types';
 import { clipEndMs } from '@/types';
 import { createId } from '@/engine/project/createProject';
 import { MIN_CLIP_MS } from './constants';
+import { localMsForMediaOffset, mediaOffsetExtended, sliceSpeed } from './curveSlice';
 
 /** Localização de um clipe: a trilha, o clipe e os índices dos dois. */
 export interface ClipLocation {
@@ -17,9 +18,9 @@ export interface ClipLocation {
   clipIndex: number;
 }
 
-/** Velocidade usada nas contas de recorte: a constante, ou 1 se for inválida. */
-function speedOf(clip: Clip): number {
-  return clip.speed.value > 0 ? clip.speed.value : 1;
+/** Posição na mídia, em ms, de um instante local do clipe (constante ou por curva). */
+function mediaAt(clip: Clip, localMs: number): number {
+  return mediaOffsetExtended(clip.speed, localMs, clip.durationMs);
 }
 
 /** Localiza um clipe pelo id em todas as trilhas. */
@@ -86,7 +87,6 @@ function shiftKeyframesStart(map: KeyframeMap, delta: number): KeyframeMap {
 /** Recorta o trecho [fromMs, toMs) de um clipe (tempos absolutos da timeline), com o id dado. */
 export function sliceClip(clip: Clip, fromMs: number, toMs: number, id: string): Clip {
   const end = clipEndMs(clip);
-  const speed = speedOf(clip);
   const rel0 = fromMs - clip.startMs;
   const rel1 = toMs - clip.startMs;
   const openEnd = toMs >= end;
@@ -95,8 +95,9 @@ export function sliceClip(clip: Clip, fromMs: number, toMs: number, id: string):
     id,
     startMs: fromMs,
     durationMs: toMs - fromMs,
-    trimInMs: clip.trimInMs + rel0 * speed,
-    trimOutMs: clip.trimOutMs + (end - toMs) * speed,
+    speed: sliceSpeed(clip.speed, clip.durationMs, rel0, rel1),
+    trimInMs: clip.trimInMs + mediaAt(clip, rel0),
+    trimOutMs: clip.trimOutMs + (mediaAt(clip, clip.durationMs) - mediaAt(clip, rel1)),
     keyframes: sliceKeyframes(clip.keyframes, rel0, rel1, openEnd),
     transitionIn: rel0 === 0 ? clip.transitionIn : undefined,
     transitionOut: openEnd ? clip.transitionOut : undefined,
@@ -154,22 +155,26 @@ export function trimClipStart(
   const found = findClip(tracks, clipId);
   if (!found || found.track.locked) return tracks;
   const { clip, track } = found;
-  const speed = speedOf(clip);
   const end = clipEndMs(clip);
   const prevEnd = track.clips
     .filter((c) => c.id !== clipId && c.startMs < clip.startMs)
     .reduce((max, c) => Math.max(max, clipEndMs(c)), 0);
-  const mediaMin = assetDurationMs === undefined ? -Infinity : clip.startMs - clip.trimInMs / speed;
+  const mediaMin =
+    assetDurationMs === undefined
+      ? -Infinity
+      : clip.startMs + localMsForMediaOffset(clip.speed, clip.durationMs, -clip.trimInMs);
   const lo = Math.max(0, prevEnd, mediaMin);
   const hi = end - MIN_CLIP_MS;
   if (lo > hi) return tracks;
   const next = Math.min(Math.max(newStartMs, lo), hi);
   if (next === clip.startMs) return tracks;
+  const rel = next - clip.startMs;
   return setClip(tracks, found, {
     ...clip,
     startMs: next,
     durationMs: end - next,
-    trimInMs: clip.trimInMs + (next - clip.startMs) * speed,
+    speed: sliceSpeed(clip.speed, clip.durationMs, rel, clip.durationMs),
+    trimInMs: clip.trimInMs + mediaAt(clip, rel),
     keyframes: shiftKeyframesStart(clip.keyframes, next - clip.startMs),
   });
 }
@@ -184,22 +189,26 @@ export function trimClipEnd(
   const found = findClip(tracks, clipId);
   if (!found || found.track.locked) return tracks;
   const { clip, track } = found;
-  const speed = speedOf(clip);
   const start = clip.startMs;
   const end = clipEndMs(clip);
   const nextStart = track.clips
     .filter((c) => c.id !== clipId && c.startMs > start)
     .reduce((min, c) => Math.min(min, c.startMs), Infinity);
-  const mediaMax = assetDurationMs === undefined ? Infinity : end + clip.trimOutMs / speed;
+  const mediaMax =
+    assetDurationMs === undefined
+      ? Infinity
+      : start + localMsForMediaOffset(clip.speed, clip.durationMs, mediaAt(clip, clip.durationMs) + clip.trimOutMs);
   const lo = start + MIN_CLIP_MS;
   const hi = Math.min(nextStart, mediaMax);
   if (lo > hi) return tracks;
   const next = Math.min(Math.max(newEndMs, lo), hi);
   if (next === end) return tracks;
+  const rel = next - start;
   return setClip(tracks, found, {
     ...clip,
-    durationMs: next - start,
-    trimOutMs: clip.trimOutMs + (end - next) * speed,
+    durationMs: rel,
+    speed: sliceSpeed(clip.speed, clip.durationMs, 0, rel),
+    trimOutMs: clip.trimOutMs + (mediaAt(clip, clip.durationMs) - mediaAt(clip, rel)),
   });
 }
 

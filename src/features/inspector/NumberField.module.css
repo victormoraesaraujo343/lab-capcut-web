@@ -10,6 +10,11 @@
   color: var(--text-muted);
 }
 
+/* Linha com controle de keyframe: uma coluna extra à direita para o losango e as setas. */
+.keyed {
+  grid-template-columns: 88px minmax(0, 1fr) 76px auto;
+}
+
 .label {
   cursor: ew-resize;
   user-select: none;

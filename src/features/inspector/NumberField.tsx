@@ -1,5 +1,6 @@
 // Campo numérico do inspetor: rótulo arrastável (scrub), slider, campo digitável e setas.
 import { useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
+import { KeyframeToggle, type KeyframeToggleProps } from './KeyframeToggle';
 import styles from './NumberField.module.css';
 
 /** Propriedades de NumberField. */
@@ -18,6 +19,8 @@ export interface NumberFieldProps {
   unit?: string;
   /** Recebe o novo valor; durante o arraste final é false, ao soltar, digitar ou usar setas é true. */
   onChange: (value: number, final: boolean) => void;
+  /** Controle de keyframe (losango e setas) ao lado do campo; sem ele, o campo é o de sempre. */
+  keyframe?: KeyframeToggleProps;
 }
 
 /** Quantidade de casas decimais do passo (0.05 -> 2, 1 -> 0). */
@@ -41,7 +44,7 @@ function parseDraft(draft: string): number | null {
 }
 
 /** Campo com rótulo, slider, valor digitável e unidade; é o controle numérico padrão do inspetor. */
-export function NumberField({ label, value, min, max, step, unit, onChange }: NumberFieldProps) {
+export function NumberField({ label, value, min, max, step, unit, onChange, keyframe }: NumberFieldProps) {
   const [draft, setDraft] = useState<string | null>(null);
   const [scrubStart, setScrubStart] = useState<{ x: number; value: number } | null>(null);
   /** Último valor mandado pelo slider, para gravar o final ao soltar. */
@@ -101,7 +104,7 @@ export function NumberField({ label, value, min, max, step, unit, onChange }: Nu
   };
 
   return (
-    <div className={styles.row}>
+    <div className={keyframe ? `${styles.row} ${styles.keyed}` : styles.row}>
       <span
         className={styles.label}
         onPointerDown={handleScrubStart}
@@ -143,6 +146,7 @@ export function NumberField({ label, value, min, max, step, unit, onChange }: Nu
         />
         {unit !== undefined && unit !== '' && <span className={styles.unit}>{unit}</span>}
       </span>
+      {keyframe && <KeyframeToggle {...keyframe} />}
     </div>
   );
 }

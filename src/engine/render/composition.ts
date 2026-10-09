@@ -13,7 +13,7 @@ import type {
   Transform,
 } from '@/types';
 import { clipEndMs } from '@/types';
-import { mediaOffsetAt } from '@/engine/timeline/speedCurve';
+import { curveSpeedAt, mediaOffsetAt } from '@/engine/timeline/speedCurve';
 import { evaluateNumber, evaluateTransform } from './keyframes';
 import { applyTransitions } from './compositionTransitions';
 import { evaluateTextAnimation, type TextAnimState } from '../text/textAnimations';
@@ -38,6 +38,9 @@ export const VISUAL_TRACK_KINDS: ReadonlySet<Track['kind']> = new Set<Track['kin
 
 /** Nome do efeito que recorta o fundo com uma máscara. */
 const MATTE_EFFECT_TYPE = 'removeBackground';
+
+/** Parâmetro numérico do efeito de recorte: atraso da máscara em relação à mídia, em ms (padrão 0). */
+const MATTE_OFFSET_PARAM = 'matteOffsetMs';
 
 /** Instante local do clipe (0 = início) se o instante da timeline cai dentro dele; senão null. */
 export function clipLocalTime(clip: Clip, timelineMs: number): number | null {
@@ -66,10 +69,15 @@ export function clipMediaTime(clip: Clip, localMs: number, assetDurationMs?: num
   return clampMediaTime(clip.trimInMs + consumed, assetDurationMs);
 }
 
-/** Velocidade com que a mídia avança na reprodução: speed do clipe; freeze frame fica parado (0). */
-export function clipPlaybackRate(clip: Clip): number {
+/**
+ * Velocidade com que a mídia avança num instante local do clipe: a constante, ou a da curva no ponto do clipe
+ * (com o mesmo sentido de tempo de clipMediaTime, para clipes invertidos); freeze frame fica parado (0).
+ */
+export function clipPlaybackRate(clip: Clip, localMs: number): number {
   if (clip.freezeFrameMs !== undefined) return 0;
-  return clip.speed.value;
+  if (clip.speed.mode === 'constant' || !(clip.durationMs > 0)) return clip.speed.value;
+  const along = clip.reversed ? clip.durationMs - localMs : localMs;
+  return curveSpeedAt(clip.speed.curve, along / clip.durationMs);
 }
 
 /** Mapa de assets por id, para consulta rápida. */
@@ -115,12 +123,22 @@ function evaluateInstance(inst: EffectInstance, keyframes: KeyframeMap, localMs:
   return { ...inst, params };
 }
 
-/** Máscara de recorte do clipe: o asset indicado no efeito 'removeBackground', se existir no projeto; senão undefined. */
+/** Atraso da máscara, em ms, do efeito de recorte; 0 se ausente ou inválido. */
+function matteOffsetOf(effectParams: Record<string, ParamValue> | undefined): number {
+  const offset = effectParams?.[MATTE_OFFSET_PARAM];
+  return typeof offset === 'number' && Number.isFinite(offset) ? offset : 0;
+}
+
+/**
+ * Máscara de recorte do clipe: o asset indicado no efeito 'removeBackground', se existir no projeto; senão undefined.
+ * O tempo da máscara é o tempo de mídia do clipe menos o atraso (matteOffsetMs), sem ficar negativo.
+ */
 function matteFor(clip: Clip, assets: Map<string, Asset>, mediaTimeMs: number): Layer['matte'] {
   const effect = clip.effects.find((e) => e.type === MATTE_EFFECT_TYPE);
   const assetId = effect?.params['matteAssetId'];
   if (typeof assetId !== 'string' || !assets.has(assetId)) return undefined;
-  return { assetId, mediaTimeMs };
+  const matteTimeMs = Math.max(0, mediaTimeMs - matteOffsetOf(effect?.params));
+  return { assetId, mediaTimeMs: matteTimeMs };
 }
 
 /**
@@ -146,7 +164,7 @@ export function layerForClipAt(
     filters: clip.filters.map((f) => evaluateInstance(f, clip.keyframes, localMs)),
     effects: clip.effects.map((e) => evaluateInstance(e, clip.keyframes, localMs)),
     zIndex,
-    playbackRate: clipPlaybackRate(clip),
+    playbackRate: clipPlaybackRate(clip, localMs),
   };
   if (clip.text) {
     const anim = evaluateTextAnimation(clip.text, localMs, clip.durationMs, project.height);

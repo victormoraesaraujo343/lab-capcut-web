@@ -3,7 +3,7 @@
 import type { Asset, Clip, Project } from '../../types/project';
 import { createAudioBufferCache, type AudioBufferCache } from './audioBufferCache';
 import { computeSegments, type ScheduledSegment } from './audioSchedule';
-import { scheduleSegment, trimPassed, type ActiveNode } from './audioNodes';
+import { readyPlaySource, scheduleSegment, trimPassed, type ActiveNode } from './audioNodes';
 
 /** Folga, em segundos, entre o agendamento e o primeiro som, para dar tempo ao motor de áudio. */
 const START_LEAD_S = 0.05;
@@ -155,7 +155,7 @@ export function createPreviewAudioEngine(): PreviewAudioEngine {
           return;
         }
         const mine = segments.filter((segment) => segment.assetId === assetId);
-        scheduleReady(context, out, buffer, clips, mine);
+        scheduleReady(context, out, asset, buffer, clips, mine);
       }),
     );
   }
@@ -164,6 +164,7 @@ export function createPreviewAudioEngine(): PreviewAudioEngine {
   function scheduleReady(
     context: AudioContext,
     out: GainNode,
+    asset: Asset,
     buffer: AudioBuffer,
     clips: Map<string, Clip>,
     segments: ScheduledSegment[],
@@ -180,7 +181,8 @@ export function createPreviewAudioEngine(): PreviewAudioEngine {
         continue;
       }
       const when = current.base.ctxTime + (remaining.startAtTimelineMs - current.timelineMsAtStart) / 1000;
-      const node = scheduleSegment(context, out, buffer, clip, remaining, when);
+      const playable = readyPlaySource(context, asset, buffer, clip);
+      const node = scheduleSegment(context, out, playable, clip, remaining, when);
       if (node !== null) {
         activeNodes.push(node);
       }

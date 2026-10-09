@@ -124,6 +124,25 @@ export function greenScreenCard(width: number, height: number): OffscreenCanvas 
   return canvas;
 }
 
+/** Máscara sintética da pessoa de greenScreenCard: silhueta em branco sobre fundo preto (mesma geometria). */
+export function personMatte(width: number, height: number): OffscreenCanvas {
+  const { canvas, ctx } = createCanvas(width, height);
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.arc(width * 0.5, height * 0.3, height * 0.16, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.roundRect(width * 0.3, height * 0.48, width * 0.4, height * 0.6, [height * 0.18, height * 0.18, 0, 0]);
+  ctx.fill();
+
+  ctx.fillRect(width * 0.3, height * 0.72, width * 0.4, height * 0.05);
+  return canvas;
+}
+
 /** Quadro que muda com o tempo: fonte do tipo dado, com o número do quadro (30 fps) e uma barra que anda. */
 export function frameAt(kind: SourceKind, timeMs: number, width = SOURCE_WIDTH, height = SOURCE_HEIGHT): OffscreenCanvas {
   const base = kind === 'gradient' ? gradientCard(width, height, 7) : greenScreenCard(width, height);
