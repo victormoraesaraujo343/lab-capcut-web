@@ -1,0 +1,87 @@
+/* Tokens de tema. Escuro é o padrão; [data-theme='light'] sobrescreve as cores. */
+
+:root,
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  /* Superfícies */
+  --bg-app: #0f0f12;
+  --bg-panel: #18181c;
+  --bg-panel-alt: #1f1f24;
+  --bg-elevated: #26262d;
+  --bg-hover: #2c2c35;
+  --border: #2a2a31;
+
+  /* Texto */
+  --text: #e8e8ec;
+  --text-muted: #a8a8b3;
+  --text-faint: #9a9aa5;
+
+  /* Acento */
+  --accent: #22d3ee;
+  --accent-hover: #67e8f9;
+  --accent-contrast: #0a0a0a;
+
+  /* Estados */
+  --danger: #f87171;
+  --focus-ring: #22d3ee;
+
+  /* Clipes (fundo) e rótulo sobre clipe */
+  --clip-video: #38bdf8;
+  --clip-audio: #4ade80;
+  --clip-text: #fbbf24;
+  --clip-sticker: #f472b6;
+  --clip-effect: #a78bfa;
+  --on-clip: #0a0a0a;
+
+  --shadow-elevated: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme='light'] {
+  color-scheme: light;
+
+  --bg-app: #f4f4f6;
+  --bg-panel: #ffffff;
+  --bg-panel-alt: #ececf0;
+  --bg-elevated: #ffffff;
+  --bg-hover: #e4e4ea;
+  --border: #d4d4dc;
+
+  --text: #18181c;
+  --text-muted: #55555f;
+  --text-faint: #62626d;
+
+  --accent: #0e7490;
+  --accent-hover: #155e75;
+  --accent-contrast: #ffffff;
+
+  --danger: #b91c1c;
+  --focus-ring: #0e7490;
+
+  --clip-video: #0e7490;
+  --clip-audio: #15803d;
+  --clip-text: #b45309;
+  --clip-sticker: #be185d;
+  --clip-effect: #6d28d9;
+  --on-clip: #ffffff;
+
+  --shadow-elevated: 0 8px 24px rgba(15, 15, 18, 0.12);
+}
+
+/* Escalas independentes de tema */
+:root {
+  --radius-sm: 4px;
+  --radius-md: 8px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --font-ui: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-size-sm: 12px;
+  --font-size-md: 13px;
+  --font-size-lg: 15px;
+}
