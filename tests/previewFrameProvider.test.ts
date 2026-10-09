@@ -111,6 +111,19 @@ describe('createPreviewFrameProvider', () => {
     expect(mocks.element.getFrame).toHaveBeenCalledTimes(2);
   });
 
+  it('quando getFrame rejeita, fecha o WebCodecs, cai no elemento no mesmo pedido e fica em fallback', async () => {
+    const element = {} as HTMLVideoElement;
+    mocks.webcodecs.getFrame.mockRejectedValueOnce(new Error('Cannot call decode on a closed codec'));
+    mocks.element.getFrame.mockResolvedValue(element);
+    const provider = createPreviewFrameProvider();
+    expect(await provider.getFrame(mp4, 300, { exact: true })).toBe(element);
+    expect(mocks.webcodecs.close).toHaveBeenCalledWith('mp4');
+    expect(mocks.element.getFrame).toHaveBeenCalledWith(mp4, 300, true);
+    expect(await provider.getFrame(mp4, 400, { exact: true })).toBe(element);
+    expect(mocks.webcodecs.getFrame).toHaveBeenCalledTimes(1);
+    expect(mocks.element.getFrame).toHaveBeenCalledTimes(2);
+  });
+
   it('cai no elemento quando open lança erro', async () => {
     const element = {} as HTMLVideoElement;
     mocks.webcodecs.open.mockRejectedValue(new Error('boom'));

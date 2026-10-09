@@ -1,0 +1,109 @@
+[
+  {
+    "family": "Inter",
+    "category": "sans",
+    "license": "SIL OFL 1.1",
+    "files": {
+      "400": "Inter-Regular.ttf",
+      "700": "Inter-Bold.ttf"
+    }
+  },
+  {
+    "family": "Roboto",
+    "category": "sans",
+    "license": "Apache 2.0",
+    "files": {
+      "400": "Roboto-Regular.ttf",
+      "700": "Roboto-Bold.ttf"
+    }
+  },
+  {
+    "family": "Space Grotesk",
+    "category": "sans",
+    "license": "SIL OFL 1.1",
+    "files": {
+      "400": "SpaceGrotesk-Regular.ttf",
+      "700": "SpaceGrotesk-Bold.ttf"
+    }
+  },
+  {
+    "family": "Michroma",
+    "category": "display",
+    "license": "SIL OFL 1.1",
+    "files": {
+      "400": "Michroma-Regular.ttf"
+    }
+  },
+  {
+    "family": "Comic Relief",
+    "category": "handwriting",
+    "license": "SIL OFL 1.1",
+    "files": {
+      "400": "ComicRelief-Regular.ttf",
+      "700": "ComicRelief-Bold.ttf"
+    }
+  },
+  {
+    "family": "JetBrains Mono",
+    "category": "mono",
+    "license": "SIL OFL 1.1",
+    "files": {
+      "400": "JetBrainsMonoNL-Regular.ttf",
+      "700": "JetBrainsMonoNL-Bold.ttf"
+    }
+  },
+  {
+    "family": "Gelasio",
+    "category": "serif",
+    "license": "SIL OFL 1.1",
+    "files": {
+      "400": "Gelasio-Regular.ttf",
+      "700": "Gelasio-Bold.ttf"
+    }
+  },
+  {
+    "family": "Ubuntu",
+    "category": "sans",
+    "license": "Ubuntu Font Licence 1.0",
+    "files": {
+      "400": "Ubuntu-Regular.ttf",
+      "700": "Ubuntu-Bold.ttf"
+    }
+  },
+  {
+    "family": "DejaVu Sans",
+    "category": "sans",
+    "license": "Bitstream Vera / DejaVu (livre)",
+    "files": {
+      "400": "DejaVuSans.ttf",
+      "700": "DejaVuSans-Bold.ttf"
+    }
+  },
+  {
+    "family": "Liberation Serif",
+    "category": "serif",
+    "license": "SIL OFL 1.1",
+    "files": {
+      "400": "LiberationSerif-Regular.ttf",
+      "700": "LiberationSerif-Bold.ttf"
+    }
+  },
+  {
+    "family": "Noto Serif",
+    "category": "serif",
+    "license": "SIL OFL 1.1",
+    "files": {
+      "400": "NotoSerif-Regular.ttf",
+      "700": "NotoSerif-Bold.ttf"
+    }
+  },
+  {
+    "family": "Caladea",
+    "category": "serif",
+    "license": "Apache 2.0",
+    "files": {
+      "400": "Caladea-Regular.ttf",
+      "700": "Caladea-Bold.ttf"
+    }
+  }
+]

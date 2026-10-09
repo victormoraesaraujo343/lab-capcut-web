@@ -4,7 +4,9 @@ import type { Mp4Info } from './demux';
 import { createFrameCache } from './frameCache';
 import type { FrameCache } from './frameCache';
 import type { SampleInfo } from './sampleIndex';
+import { openWebm } from './webmDemux';
 import { readFile } from '../storage/opfs';
+import { fileExtension } from '../storage/paths';
 
 const CACHE_CAPACITY = 45;
 const DEFAULT_FRAME_US = 33_333;
@@ -41,6 +43,11 @@ export interface Session {
 /** Resultado da abertura: a sessão pronta ou o motivo da falha ('unreadable', 'parse' ou 'unsupported'). */
 export type OpenResult = { ok: true; session: Session } | { ok: false; reason: 'unreadable' | 'parse' | 'unsupported' };
 
+/** Diz se o arquivo é WebM, pelo tipo do arquivo ou pela extensão do caminho no OPFS. */
+function isWebmFile(file: File, opfsPath: string): boolean {
+  return file.type.toLowerCase().includes('webm') || fileExtension(opfsPath) === 'webm';
+}
+
 /** Abre o arquivo do OPFS, lê a trilha de vídeo e monta a sessão; falha se o codec não for suportado. */
 export async function openAssetSession(assetId: string, opfsPath: string): Promise<OpenResult> {
   let file: File;
@@ -51,7 +58,7 @@ export async function openAssetSession(assetId: string, opfsPath: string): Promi
     return { ok: false, reason: 'unreadable' };
   }
   try {
-    info = await openMp4(file);
+    info = isWebmFile(file, opfsPath) ? await openWebm(file) : await openMp4(file);
   } catch {
     return { ok: false, reason: 'parse' };
   }

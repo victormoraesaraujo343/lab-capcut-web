@@ -1,3 +1,6 @@
 node_modules
 dist
 .DS_Store
+public/ffmpeg
+tests/output
+tests/fixtures/media/video-1min.mp4

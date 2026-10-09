@@ -26,10 +26,13 @@ export function trimPassed(segment: ScheduledSegment, nowMs: number): ScheduledS
   };
 }
 
-/** Cria e inicia a fonte de um trecho, com o envelope de volume do clipe, no instante `when`. */
+/**
+ * Cria e inicia a fonte de um trecho, com o envelope de volume do clipe, no instante `when`.
+ * Serve à prévia (AudioContext) e à mixagem offline (OfflineAudioContext), ligando no `output` dado.
+ */
 export function scheduleSegment(
-  context: AudioContext,
-  master: GainNode,
+  context: BaseAudioContext,
+  output: AudioNode,
   buffer: AudioBuffer,
   clip: Clip,
   segment: ScheduledSegment,
@@ -40,7 +43,7 @@ export function scheduleSegment(
   source.playbackRate.value = segment.playbackRate;
   const gain = context.createGain();
   source.connect(gain);
-  gain.connect(master);
+  gain.connect(output);
   const localStartMs = segment.startAtTimelineMs - clip.startMs;
   scheduleEnvelope(gain, clip, localStartMs, when);
   source.start(when, segment.offsetInMediaMs / 1000);

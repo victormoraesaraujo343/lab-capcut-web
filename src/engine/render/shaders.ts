@@ -11,11 +11,12 @@ void main() {
   vec3 clip = u_matrix * vec3(a_position, 1.0);
   gl_Position = vec4(clip.xy, 0.0, 1.0);
   // u_uvRect = [u0, v0, u1, v1] em espaço de imagem (origem no canto superior esquerdo).
-  // a_position.y cresce para cima, então o UV vertical é invertido.
+  // O quad está no espaço do projeto com y para BAIXO (layerMatrix leva (-0.5,-0.5) ao canto superior
+  // esquerdo) e a textura sobe sem UNPACK_FLIP_Y (linha 0 = topo, v = 0), então o UV vertical é direto.
   vec2 unit = a_position + vec2(0.5);
   v_uv = vec2(
     mix(u_uvRect.x, u_uvRect.z, unit.x),
-    mix(u_uvRect.y, u_uvRect.w, 1.0 - unit.y)
+    mix(u_uvRect.y, u_uvRect.w, unit.y)
   );
 }
 `;

@@ -8,8 +8,8 @@ Orquestrador: Opus 5.5. Agentes: Haiku (tarefas), Sonnet (revisor).
 | 2 | Importar mídia | ✅ passou |
 | 3 | Linha do tempo | ✅ passou |
 | 4 | Prévia e reprodução | ✅ passou |
-| 5 | Exportar | em andamento |
-| 6 | Texto | pendente |
+| 5 | Exportar | ✅ passou |
+| 6 | Texto | em andamento |
 | 7 | Transições, filtros, efeitos, velocidade | pendente |
 | 8 | Áudio | pendente |
 | 9 | Stickers, formas, sobreposições | pendente |
@@ -49,3 +49,9 @@ Orquestrador: Opus 5.5. Agentes: Haiku (tarefas), Sonnet (revisor).
 - Etapa 4 passou (revisor rodada 2: PASSA; 523 testes). Critério medido no navegador real com play pelo botão e janela visível: 3 trilhas de vídeo sobrepostas + música → 34,5 atualizações/s, maior pausa 23 ms, relógio de áudio 2005 ms em 2000 ms.
 - Layout: `computeEditorLayout` encolhe/esconde painéis laterais pra prévia ter ≥360 px.
 - Menores abertos (raros): corridas de closeAsset durante abertura de asset; <video> de fallback mudo continua tocando se o cursor sair de todos os clipes até a pausa.
+- Etapa 5 (em revisão). Critério cumprido pelo botão Exportar: 1 min 1080p30 MP4 → H.264 High + AAC-LC 48k estéreo, 60,000 s ambos, faststart, decodifica sem erro; 59 bipes com 0 ms de diferença vs original. WebM (VP9+Opus), GIF, WAV e MP3 validados com ffprobe. Exportação ~1,3× mais rápida que o tempo real.
+- Decisões: (1) leitor de WebM próprio (EBML) — sem biblioteca permitida; serve prévia e exportação no worker; (2) Chromium Linux não codifica AAC → worker gera vídeo e ffmpeg.wasm junta AAC com `-c:v copy`; (3) núcleo do ffmpeg copiado para public/ffmpeg (scripts/copy-ffmpeg.mjs, predev/prebuild), nada de CDN; (4) @types/node só em tsconfig.node.json (vite.config) — não vaza para src; (5) plugin de dev `/__dev/save` grava exportações em tests/output para conferir com ffprobe.
+- ⚠️ Bug grave corrigido pelo orquestrador: shader invertia a textura na vertical → prévia e exportação saíam de cabeça pra baixo. Lição: testar com fonte ASSIMÉTRICA (testsrc2 tem relógio no canto superior esquerdo) e comparar com o original via ffmpeg.
+- VP9 perfil 1 (4:4:4) sem CodecPrivate: perfil lido do cabeçalho do 1º quadro-chave.
+- Etapa 5 passou (revisor: PASSA). Menores corrigidos: corrida no cancelamento, reserva ffmpeg também para codec sem suporte, altura par no modo compatível, foco no diálogo, aviso de arquivo >1,5 GB.
+- Etapa 6 preparada: 12 fontes livres copiadas do sistema para public/fonts (fonts.json + LICENCAS.md, 8 MB); vídeo de teste com fala sintética (tests/fixtures/media/fala-1min.mp4, voz flite em inglês).

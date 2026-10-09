@@ -79,13 +79,22 @@ export function createPreviewFrameProvider(): PreviewFrameProvider {
       return null;
     }
     if (usesWebCodecs(asset) && (await ensureOpen(asset))) {
-      // Erro pontual do WebCodecs cai no <video> só para este pedido.
-      const frame = await decodeWithWebCodecs(asset, mediaTimeMs, request.exact).catch(() => undefined);
-      if (frame !== undefined) {
-        return frame;
+      try {
+        return await decodeWithWebCodecs(asset, mediaTimeMs, request.exact);
+      } catch {
+        // Rejeição do WebCodecs (codec fechado ou erro de decodificação): o asset vira fallback permanente.
+        markFallback(asset);
       }
     }
     return getElementFrame(asset, mediaTimeMs, request);
+  }
+
+  /** Marca o asset como fallback permanente e fecha a decodificação dele no WebCodecs. */
+  function markFallback(asset: Asset): void {
+    fallbackIds.add(asset.id);
+    if (!disposed) {
+      getWebCodecs().close(asset.id);
+    }
   }
 
   function prefetch(asset: Asset, mediaTimeMs: number, direction: 1 | -1): void {

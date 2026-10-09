@@ -3,8 +3,8 @@ import type { Asset } from '../../types/project';
 import type { DecodeRequest, DecodeResponse } from '../workers/decodeProtocol';
 import { fileExtension } from '../storage/paths';
 
-const DEMUX_MIME_TYPES = ['video/mp4', 'video/quicktime', 'video/x-m4v'];
-const DEMUX_EXTENSIONS = ['mp4', 'mov', 'm4v'];
+const DEMUX_MIME_TYPES = ['video/mp4', 'video/quicktime', 'video/x-m4v', 'video/webm'];
+const DEMUX_EXTENSIONS = ['mp4', 'mov', 'm4v', 'webm'];
 
 /** Fonte de quadros por WebCodecs, com a mesma forma usada pela prévia e pela exportação. */
 export interface WebCodecsSource {
@@ -42,7 +42,7 @@ export function isWebCodecsSupported(): boolean {
   return typeof VideoDecoder !== 'undefined';
 }
 
-/** Diz se o asset é um MP4/MOV/M4V que o demux do worker sabe ler (WebM fica para o fallback). */
+/** Diz se o asset é um MP4/MOV/M4V/WebM que o demux do worker sabe ler. */
 export function canDemux(asset: Asset): boolean {
   const mime = asset.mimeType.split(';')[0]?.trim().toLowerCase() ?? '';
   if (DEMUX_MIME_TYPES.includes(mime)) {

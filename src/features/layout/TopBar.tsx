@@ -14,10 +14,12 @@ export interface TopBarProps {
   onBack?: () => void;
   /** Recebe o novo nome quando o usuário renomeia o projeto no próprio cabeçalho. */
   onRename?: (name: string) => void;
+  /** Abre o diálogo de exportação; sem ele o botão aparece desabilitado. */
+  onExport?: () => void;
 }
 
-/** Barra superior de 44px: voltar, nome do projeto (renomeável), troca de tema e exportação (desabilitada por enquanto). */
-export function TopBar({ theme, onToggleTheme, projectName, onBack, onRename }: TopBarProps) {
+/** Barra superior de 44px: voltar, nome do projeto (renomeável), troca de tema e exportação (só com projeto aberto). */
+export function TopBar({ theme, onToggleTheme, projectName, onBack, onRename, onExport }: TopBarProps) {
   const ThemeIcon = theme === 'dark' ? Sun : Moon;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
@@ -90,10 +92,12 @@ export function TopBar({ theme, onToggleTheme, projectName, onBack, onRename }: 
 
       <div className={styles.right}>
         <IconButton icon={ThemeIcon} label={t.app.toggleTheme} onClick={onToggleTheme} />
-        <button type="button" className={styles.exportButton} disabled>
-          <Download size={16} strokeWidth={1.75} aria-hidden="true" />
-          <span>{t.app.export}</span>
-        </button>
+        {projectName !== undefined ? (
+          <button type="button" className={styles.exportButton} disabled={onExport === undefined} onClick={onExport}>
+            <Download size={16} strokeWidth={1.75} aria-hidden="true" />
+            <span>{t.app.export}</span>
+          </button>
+        ) : null}
       </div>
     </header>
   );

@@ -1,8 +1,9 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { SlidersHorizontal, type LucideIcon } from 'lucide-react';
 import { t } from '../../i18n/pt-BR';
-import { runWithToast, useProjectStore, useUiStore } from '../../stores';
+import { runWithToast, useProjectStore, usePlaybackStore, useUiStore } from '../../stores';
 import { TopBar } from '../layout/TopBar';
+import { ExportDialog } from '../export/ExportDialog';
 import { PanelShell } from '../layout/PanelShell';
 import { MediaPanel } from '@/features/media/MediaPanel';
 import { TimelinePanel } from '@/features/timeline/TimelinePanel';
@@ -64,6 +65,7 @@ export function EditorScreen() {
   const inspectorWidth = useUiStore((s) => s.panelSizes.inspectorWidth);
   const timelineHeight = useUiStore((s) => s.panelSizes.timelineHeight);
   const [viewport, setViewport] = useState(readViewport);
+  const [exportOpen, setExportOpen] = useState(false);
 
   useEffect(() => {
     const onResize = () => setViewport(readViewport());
@@ -97,75 +99,85 @@ export function EditorScreen() {
   }
   const colOf = (key: string): number => columns.findIndex((c) => c.key === key) + 1;
 
+  /** Abre o diálogo de exportação e pausa a reprodução. */
+  const openExport = (): void => {
+    usePlaybackStore.getState().pause();
+    setExportOpen(true);
+  };
+
   return (
-    <div
-      className={styles.editor}
-      style={{
-        gridTemplateColumns: columns.map((c) => c.size).join(' '),
-        gridTemplateRows: `${TOP_BAR_HEIGHT}px minmax(0, 1fr) ${HANDLE_SIZE}px ${layout.timelineHeight}px`,
-      }}
-    >
-      <Cell className={styles.top}>
-        <TopBar
-          theme={theme}
-          onToggleTheme={toggleTheme}
-          projectName={project.name}
-          onBack={() => void runWithToast(closeProject(), t.errors.projectSave)}
-          onRename={handleRename}
-        />
-      </Cell>
+    <>
+      <div
+        className={styles.editor}
+        style={{
+          gridTemplateColumns: columns.map((c) => c.size).join(' '),
+          gridTemplateRows: `${TOP_BAR_HEIGHT}px minmax(0, 1fr) ${HANDLE_SIZE}px ${layout.timelineHeight}px`,
+        }}
+      >
+        <Cell className={styles.top}>
+          <TopBar
+            theme={theme}
+            onToggleTheme={toggleTheme}
+            projectName={project.name}
+            onBack={() => void runWithToast(closeProject(), t.errors.projectSave)}
+            onRename={handleRename}
+            onExport={openExport}
+          />
+        </Cell>
 
-      {layout.showMedia && (
-        <>
-          <Cell className={styles.media} column={colOf('media')}>
-            <MediaPanel />
-          </Cell>
+        {layout.showMedia && (
+          <>
+            <Cell className={styles.media} column={colOf('media')}>
+              <MediaPanel />
+            </Cell>
 
-          <Cell className={styles.handleMedia} column={colOf('handleMedia')}>
-            <ResizeHandle
-              orientation="vertical"
-              label={t.resize.media}
-              onResize={(delta) => adjustPanel('mediaWidth', delta)}
-            />
-          </Cell>
-        </>
-      )}
+            <Cell className={styles.handleMedia} column={colOf('handleMedia')}>
+              <ResizeHandle
+                orientation="vertical"
+                label={t.resize.media}
+                onResize={(delta) => adjustPanel('mediaWidth', delta)}
+              />
+            </Cell>
+          </>
+        )}
 
-      <Cell className={styles.preview} column={colOf('preview')}>
-        <PreviewPanel>
-          <TransformOverlay />
-        </PreviewPanel>
-      </Cell>
+        <Cell className={styles.preview} column={colOf('preview')}>
+          <PreviewPanel>
+            <TransformOverlay />
+          </PreviewPanel>
+        </Cell>
 
-      {layout.showInspector && (
-        <>
-          <Cell className={styles.handleInspector} column={colOf('handleInspector')}>
-            <ResizeHandle
-              orientation="vertical"
-              label={t.resize.inspector}
-              onResize={(delta) => adjustPanel('inspectorWidth', -delta)}
-            />
-          </Cell>
+        {layout.showInspector && (
+          <>
+            <Cell className={styles.handleInspector} column={colOf('handleInspector')}>
+              <ResizeHandle
+                orientation="vertical"
+                label={t.resize.inspector}
+                onResize={(delta) => adjustPanel('inspectorWidth', -delta)}
+              />
+            </Cell>
 
-          <Cell className={styles.inspector} column={colOf('inspector')}>
-            <PanelShell title={t.panels.inspector}>
-              <EmptyState icon={SlidersHorizontal} text={t.inspector.empty} />
-            </PanelShell>
-          </Cell>
-        </>
-      )}
+            <Cell className={styles.inspector} column={colOf('inspector')}>
+              <PanelShell title={t.panels.inspector}>
+                <EmptyState icon={SlidersHorizontal} text={t.inspector.empty} />
+              </PanelShell>
+            </Cell>
+          </>
+        )}
 
-      <Cell className={styles.handleTimeline}>
-        <ResizeHandle
-          orientation="horizontal"
-          label={t.resize.timeline}
-          onResize={(delta) => adjustPanel('timelineHeight', -delta)}
-        />
-      </Cell>
+        <Cell className={styles.handleTimeline}>
+          <ResizeHandle
+            orientation="horizontal"
+            label={t.resize.timeline}
+            onResize={(delta) => adjustPanel('timelineHeight', -delta)}
+          />
+        </Cell>
 
-      <Cell className={styles.timeline}>
-        <TimelinePanel />
-      </Cell>
-    </div>
+        <Cell className={styles.timeline}>
+          <TimelinePanel />
+        </Cell>
+      </div>
+      {exportOpen && <ExportDialog project={project} onClose={() => setExportOpen(false)} />}
+    </>
   );
 }
