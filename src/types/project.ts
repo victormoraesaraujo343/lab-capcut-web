@@ -167,6 +167,20 @@ export interface ShapeData {
   stroke: string;
   /** Espessura do contorno em pixels. */
   strokeWidth: number;
+  /** Largura da forma em px do projeto (para 'line'/'arrow': comprimento). */
+  width: number;
+  /** Altura da forma em px do projeto (para 'line'/'arrow': ignorada; a espessura vem de strokeWidth). */
+  height: number;
+  /** Raio dos cantos do retângulo em px (0 = reto). */
+  cornerRadius: number;
+}
+
+/** Sobreposição animada (luz vazada, poeira, chuva, neve…): shader procedural do registro (categoria 'overlay'). */
+export interface OverlayData {
+  type: string;
+  params: Record<string, number | string | boolean>;
+  /** Mistura com o que está embaixo. */
+  blend: 'screen' | 'add' | 'normal';
 }
 
 /** Configurações de áudio de um clipe. */
@@ -246,6 +260,8 @@ export interface Clip {
   audioDetached?: boolean;
   /** Clipe de fala sintética (em trilha de áudio, sem assetId). */
   tts?: TtsData;
+  /** Clipe de sobreposição animada (em trilha 'effect' ou 'sticker', sem assetId). */
+  overlay?: OverlayData;
 }
 
 /** Trilha da timeline. */

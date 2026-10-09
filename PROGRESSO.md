@@ -12,7 +12,7 @@ Orquestrador: Opus 5.5. Agentes: Haiku (tarefas), Sonnet (revisor).
 | 6 | Texto | ✅ passou |
 | 7 | Transições, filtros, efeitos, velocidade | ✅ passou |
 | 8 | Áudio | ✅ passou |
-| 9 | Stickers, formas, sobreposições | em andamento |
+| 9 | Stickers, formas, sobreposições | ✅ passou |
 | 10 | Polimento e Pro liberado | pendente |
 
 ## Decisões e ocorrências
@@ -76,3 +76,8 @@ Orquestrador: Opus 5.5. Agentes: Haiku (tarefas), Sonnet (revisor).
 - Portão de ruído (AudioWorklet 'noise-gate', empacotado com `?worker&url`) testado no navegador: ruído −65→−91 dB, voz passa igual.
 - Decisão: texto pra fala = speechSynthesis (como o plano manda) → toca só na prévia; o navegador não deixa gravar essa voz no arquivo — a interface avisa e sugere gravar narração.
 - Pendências p/ etapa 10: ao pausar, cortar a cauda do eco/reverb já montada; portão começa fechado (10–15 ms atenuados após play); marcações de batida fora do desfazer.
+- Etapa 9 — contrato (orquestrador): ShapeData com width/height/cornerRadius; OverlayData {type, params, blend}; Clip.overlay; Layer kind 'shape'|'overlay'; categoria 'overlay' no registro (shader procedural sem textura de entrada).
+- Etapa 9: 100 figurinhas geradas a partir de 59 ícones do lucide (ISC, já é dependência) + selos/decorativos próprios em SVG; rasterizadas para PNG ao inserir (o worker de exportação não lê SVG). GIF/WebP animado via ImageDecoder na prévia e no worker, repetindo em ciclo. Formas por canvas 2D (como texto). 6 sobreposições por shader (luz vazada, poeira, chuva, neve, grão, bokeh) com mistura clarear/somar/normal.
+- Etapa 9 passou (revisor: PASSA após 2 correções — GIF congelava após 1 ciclo; cliques seguidos duplicavam asset; 1364 testes; 115 testes de imagem). Critério no navegador: figurinha clicada na aba Stickers → pontos-chave de posição e rotação → MP4 exportado com a figurinha atravessando e girando; seta e neve nos tempos certos; GIF enviado anima no MP4.
+- Ajustes visuais do orquestrador (vistos em 720p): chuva grossa/quadrada → riscos finos; neve parecia estrela → flocos maiores e suaves; poeira invisível; bokeh agrupado (hash com índices seguidos). Aba Stickers com blocos sobrepostos (painel de altura fixa encolhia os filhos) → aba rola inteira; formas/sobreposições/envio no topo, grade embaixo.
+- Lição: sobreposições/shaders procedurais não dá pra julgar na imagem de teste 320×180 — conferir em 720p.

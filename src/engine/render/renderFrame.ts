@@ -2,6 +2,7 @@
 import type { Asset, Project } from '../../types/project';
 import type { Compositor, FrameImage, FrameProvider, Layer, TextRasterizer } from '../../types/render';
 import { createTextRasterizer } from '../text/textRasterizer';
+import { createShapeRasterizer, type ShapeRasterizer } from '../shapes/shapeRasterizer';
 import { resolveLayers } from './composition';
 
 /** Opções de um quadro composto: escala do quadro de saída, precisão e cor de fundo. */
@@ -35,6 +36,23 @@ function defaultRasterizer(): TextRasterizer {
   return sharedRasterizer;
 }
 
+/** Rasterizador de formas padrão do contexto, criado só na primeira camada de forma. */
+let sharedShapeRasterizer: ShapeRasterizer | null = null;
+
+/** Devolve o rasterizador de formas padrão do contexto, criando-o preguiçosamente. */
+function defaultShapeRasterizer(): ShapeRasterizer {
+  sharedShapeRasterizer ??= createShapeRasterizer();
+  return sharedShapeRasterizer;
+}
+
+/** Fontes de imagem geradas por canvas: cada uma é preguiçosa, para não criar o rasterizador sem uso. */
+interface Rasterizers {
+  /** Rasterizador de texto. */
+  text: () => TextRasterizer;
+  /** Rasterizador de formas. */
+  shape: () => ShapeRasterizer;
+}
+
 /** Camada e, se houver transição, a que entra: as duas precisam de imagem. */
 function layerFamily(layer: Layer): Layer[] {
   return layer.transition ? [layer, layer.transition.incoming] : [layer];
@@ -58,7 +76,7 @@ function collectJobs(layers: Layer[], assets: Map<string, Asset>): FrameJob[] {
 
 /**
  * Desenha o quadro do instante na escala pedida e devolve as camadas desenhadas.
- * Camadas de texto são rasterizadas pelo rasterizador (dono do próprio cache), não pelo provider.
+ * Camadas de texto e de forma são rasterizadas pelos rasterizadores (donos dos próprios caches), não pelo provider.
  */
 export async function renderFrame(
   compositor: Compositor,
@@ -67,6 +85,7 @@ export async function renderFrame(
   provider: FrameProvider,
   options: RenderFrameOptions,
   textRasterizer?: TextRasterizer,
+  shapeRasterizer?: ShapeRasterizer,
 ): Promise<Layer[]> {
   if (!(options.scale > 0)) throw new Error('invalid-render-scale');
   const layers = resolveLayers(project, timelineMs);
@@ -98,7 +117,11 @@ export async function renderFrame(
   }
 
   try {
-    const { drawn, images } = assembleLayers(layers, frames, () => textRasterizer ?? defaultRasterizer());
+    const rasterizers: Rasterizers = {
+      text: () => textRasterizer ?? defaultRasterizer(),
+      shape: () => shapeRasterizer ?? defaultShapeRasterizer(),
+    };
+    const { drawn, images } = assembleLayers(layers, frames, rasterizers);
     compositor.draw(drawn, images, {
       width: Math.round(project.width * options.scale),
       height: Math.round(project.height * options.scale),
@@ -112,15 +135,22 @@ export async function renderFrame(
   }
 }
 
-/** Põe uma camada no mapa de imagens (texto é rasterizado; mídia usa o quadro obtido e a máscara). Null sem imagem. */
+/** Põe uma camada no mapa de imagens (texto e forma são rasterizados; mídia usa o quadro obtido e a máscara). Null sem imagem. */
 function place(
   layer: Layer,
   frames: Map<string, FrameImage>,
   images: Map<string, FrameImage>,
-  rasterizer: () => TextRasterizer,
+  rasterizers: Rasterizers,
 ): Layer | null {
+  // Sobreposição é shader procedural: não tem imagem de origem.
+  if (layer.overlay) return layer;
   if (layer.text) {
-    const surface = rasterizer().rasterize(layer.text.data, layer.text.reveal);
+    const surface = rasterizers.text().rasterize(layer.text.data, layer.text.reveal);
+    images.set(layer.clipId, surface);
+    return { ...layer, sourceWidth: surface.width, sourceHeight: surface.height };
+  }
+  if (layer.shape) {
+    const surface = rasterizers.shape().rasterize(layer.shape);
     images.set(layer.clipId, surface);
     return { ...layer, sourceWidth: surface.width, sourceHeight: surface.height };
   }
@@ -133,25 +163,25 @@ function place(
 }
 
 /**
- * Junta as camadas na ordem de resolução: quadros obtidos e textos rasterizados.
+ * Junta as camadas na ordem de resolução: quadros obtidos, textos e formas rasterizados.
  * Transição: a camada que sai carrega a que entra (já com imagem própria); a que entra não vai separada na lista.
  */
 function assembleLayers(
   layers: Layer[],
   frames: Map<string, FrameImage>,
-  rasterizer: () => TextRasterizer,
+  rasterizers: Rasterizers,
 ): { drawn: Layer[]; images: Map<string, FrameImage> } {
   const drawn: Layer[] = [];
   const images = new Map<string, FrameImage>();
   for (const layer of layers) {
     const transition = layer.transition;
     if (!transition) {
-      const placed = place(layer, frames, images, rasterizer);
+      const placed = place(layer, frames, images, rasterizers);
       if (placed) drawn.push(placed);
       continue;
     }
-    const outgoing = place(layer, frames, images, rasterizer);
-    const incoming = place(transition.incoming, frames, images, rasterizer);
+    const outgoing = place(layer, frames, images, rasterizers);
+    const incoming = place(transition.incoming, frames, images, rasterizers);
     if (!outgoing && !incoming) continue;
     drawn.push({ ...(outgoing ?? layer), transition: { ...transition, incoming: incoming ?? transition.incoming } });
   }

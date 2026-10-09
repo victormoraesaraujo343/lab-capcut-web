@@ -73,7 +73,7 @@ export function createPreviewFrameProvider(): PreviewFrameProvider {
       return null;
     }
     if (asset.kind === 'image' || asset.kind === 'sticker') {
-      return images.getImage(asset);
+      return images.getImage(asset, mediaTimeMs);
     }
     if (asset.kind !== 'video') {
       return null;

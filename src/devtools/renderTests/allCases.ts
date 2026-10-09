@@ -23,6 +23,7 @@ import { createSyntheticProvider } from './sources';
 import { extraCases } from './casesExtra';
 import { coverageCases } from './casesCoverage';
 import { comboCases } from './casesCombos';
+import { stage9Cases } from './casesStage9';
 
 /** Transforma um id livre numa chave segura para nome de arquivo. */
 function safeId(raw: string): string {
@@ -131,4 +132,5 @@ export const RENDER_CASES: RenderCase[] = [
   ...extraCases(),
   ...coverageCases(),
   ...comboCases(),
+  ...stage9Cases(),
 ];

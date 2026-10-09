@@ -1,6 +1,6 @@
 // Criação de clipes novos a partir de assets da biblioteca de mídia.
 
-import type { Asset, AssetKind, Clip, TextStyle, TrackKind } from '@/types';
+import type { Asset, AssetKind, Clip, ShapeData, TextStyle, TrackKind } from '@/types';
 import { defaultAudioFx, defaultSpeed, defaultTransform } from '@/types';
 import { createId } from '@/engine/project/createProject';
 import { IMAGE_DEFAULT_DURATION_MS } from './constants';
@@ -65,5 +65,34 @@ export function createTextClip(
     reversed: false,
     audio: defaultAudioFx(),
     text: { content, style },
+  };
+}
+
+/** Duração padrão de uma forma na timeline, em ms. */
+const SHAPE_DEFAULT_DURATION_MS = 3000;
+
+/** Cria um clipe de forma nova, sem asset, com transformação padrão, na trilha e posição dadas. */
+export function createShapeClip(
+  trackId: string,
+  startMs: number,
+  shape: ShapeData,
+  durationMs = SHAPE_DEFAULT_DURATION_MS,
+): Clip {
+  return {
+    id: createId(),
+    trackId,
+    startMs: Math.max(0, startMs),
+    durationMs,
+    trimInMs: 0,
+    trimOutMs: 0,
+    transform: defaultTransform(),
+    speed: defaultSpeed(),
+    volume: 1,
+    keyframes: {},
+    filters: [],
+    effects: [],
+    reversed: false,
+    audio: defaultAudioFx(),
+    shape,
   };
 }

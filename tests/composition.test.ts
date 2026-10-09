@@ -444,3 +444,91 @@ describe('atraso da máscara do removeBackground', () => {
     expect(layers[0]?.matte).toEqual({ assetId: 'm1', mediaTimeMs: 0 });
   });
 });
+
+/** Clipe de forma de teste, sem asset, na trilha dada. */
+function makeShapeClip(overrides: Partial<Clip> = {}): Clip {
+  return makeClip({
+    assetId: undefined,
+    shape: { shape: 'rectangle', width: 600, height: 340, cornerRadius: 24, fill: '#22d3ee', stroke: '#ffffff', strokeWidth: 10 },
+    ...overrides,
+  });
+}
+
+describe('camadas de forma', () => {
+  it('clipe com shape vira camada de forma sem asset, com fit none e tamanho a medir', () => {
+    const project = makeProject([makeTrack('st', 'sticker', [makeShapeClip()])], []);
+    const layers = resolveLayers(project, 100);
+    expect(layers).toHaveLength(1);
+    const layer = layers[0];
+    expect(layer?.kind).toBe('shape');
+    expect(layer?.fit).toBe('none');
+    expect(layer?.assetId).toBeUndefined();
+    expect(layer?.sourceWidth).toBe(0);
+    expect(layer?.sourceHeight).toBe(0);
+    expect(layer?.shape).toMatchObject({ shape: 'rectangle', width: 600, strokeWidth: 10 });
+    expect(layer?.text).toBeUndefined();
+  });
+
+  it('forma respeita o tempo do clipe: some fora do intervalo', () => {
+    const project = makeProject([makeTrack('st', 'sticker', [makeShapeClip({ startMs: 200, durationMs: 500 })])], []);
+    expect(resolveLayers(project, 100)).toHaveLength(0);
+    expect(resolveLayers(project, 300)).toHaveLength(1);
+    expect(resolveLayers(project, 700)).toHaveLength(0);
+  });
+
+  it('forma usa a transformação do clipe, sem animação de texto', () => {
+    const clip = makeShapeClip({ transform: { ...defaultTransform(), x: 40, y: -20 } });
+    const project = makeProject([makeTrack('st', 'sticker', [clip])], []);
+    const layer = resolveLayers(project, 100)[0];
+    expect(layer?.transform).toMatchObject({ x: 40, y: -20, scaleX: 1, opacity: 1 });
+  });
+});
+
+describe('sobreposições', () => {
+  /** Clipe de sobreposição de chuva na trilha de efeito, sem asset, de 0 a 1000 ms. */
+  function overlayClip(overrides: Partial<Clip> = {}): Clip {
+    return {
+      id: 'ov1',
+      trackId: 'fx',
+      startMs: 0,
+      durationMs: 1000,
+      trimInMs: 0,
+      trimOutMs: 0,
+      transform: defaultTransform(),
+      speed: defaultSpeed(),
+      volume: 1,
+      keyframes: {},
+      filters: [],
+      effects: [],
+      reversed: false,
+      audio: defaultAudioFx(),
+      overlay: { type: 'rain', params: { density: 0.6 }, blend: 'normal' },
+      ...overrides,
+    };
+  }
+
+  it('clipe com overlay vira camada overlay sem asset, com fit contain e tamanho do projeto', () => {
+    const project = makeProject([makeTrack('fx', 'effect', [overlayClip()])], []);
+    const layers = resolveLayers(project, 500);
+    expect(layers).toHaveLength(1);
+    const layer = layers[0];
+    expect(layer?.kind).toBe('overlay');
+    expect(layer?.assetId).toBeUndefined();
+    expect(layer?.fit).toBe('contain');
+    expect(layer?.sourceWidth).toBe(1080);
+    expect(layer?.sourceHeight).toBe(1920);
+    expect(layer?.localTimeMs).toBe(500);
+    expect(layer?.overlay).toEqual({ type: 'rain', params: { density: 0.6 }, blend: 'normal' });
+  });
+
+  it('a opacidade e a transformação do clipe valem para a camada de sobreposição', () => {
+    const clip = overlayClip({ transform: { ...defaultTransform(), opacity: 0.4 } });
+    const layers = resolveLayers(makeProject([makeTrack('fx', 'effect', [clip])], []), 100);
+    expect(layers[0]?.transform.opacity).toBe(0.4);
+  });
+
+  it('fora do intervalo do clipe a sobreposição não aparece', () => {
+    const layers = resolveLayers(makeProject([makeTrack('fx', 'effect', [overlayClip()])], []), 1500);
+    expect(layers).toHaveLength(0);
+  });
+});

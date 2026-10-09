@@ -11,6 +11,8 @@ import { AudioSection } from './AudioSection';
 import { ClipToolsSection } from './ClipToolsSection';
 import { EffectsSection } from './EffectsSection';
 import { FiltersSection } from './FiltersSection';
+import { OverlaySection } from './OverlaySection';
+import { ShapeSection } from './ShapeSection';
 import { SpeechSection } from './SpeechSection';
 import { SpeedSection } from './SpeedSection';
 import { TextAnimationSection } from './TextAnimationSection';
@@ -147,6 +149,8 @@ function MediaClipBody({ project, clip, visual, hasSound, asset, tab, onTab }: M
         {current === 'basic' && (
           <>
             {visual && <TransformSection clip={clip} canvas={{ width: project.width, height: project.height }} />}
+            {clip.shape !== undefined && <ShapeSection clip={clip} />}
+            {clip.overlay !== undefined && <OverlaySection clip={clip} />}
             {clip.tts !== undefined && <SpeechSection clip={clip} />}
             {hasSound && <AudioSection clip={clip} asset={asset} />}
             {clip.transitionOut !== undefined && <TransitionSection clip={clip} />}
@@ -179,7 +183,9 @@ export function InspectorPanel() {
     const { clip, track } = found;
     const asset = project.assets.find((item) => item.id === clip.assetId);
     const audioOnly = track.kind === 'audio' || asset?.kind === 'audio';
-    const hasSound = audioOnly || asset?.kind === 'video';
+    // Formas e sobreposições são visuais: não têm som, velocidade nem áudio próprio.
+    const decorative = clip.shape !== undefined || clip.overlay !== undefined;
+    const hasSound = !decorative && (audioOnly || asset?.kind === 'video');
     body =
       clip.text !== undefined ? (
         <TextClipBody project={project} clip={clip} text={clip.text} tab={tab} onTab={setTab} />

@@ -3,6 +3,7 @@ import { prefetchAround, renderFrame } from '../src/engine/render/renderFrame';
 import { resolveLayers } from '../src/engine/render/composition';
 import { defaultTransform, type Asset, type Project, type TextData } from '../src/types/project';
 import type { CompositeOptions, Compositor, FrameImage, FrameProvider, Layer, TextRasterizer } from '../src/types/render';
+import type { ShapeRasterizer } from '../src/engine/shapes/shapeRasterizer';
 
 vi.mock('../src/engine/render/composition', () => ({
   resolveLayers: vi.fn(),
@@ -353,3 +354,66 @@ describe('renderFrame', () => {
     expect(provider.released).toEqual([frame, matte]);
   });
 });
+
+describe('renderFrame com formas', () => {
+  beforeEach(() => {
+    resolveLayersMock.mockReset();
+  });
+
+  it('rasteriza a camada de forma, usa o tamanho da imagem e não a libera no provider', async () => {
+    const shape = { shape: 'circle', width: 400, height: 400, cornerRadius: 0, fill: '#f43f5e', stroke: '#ffffff', strokeWidth: 0 } as const;
+    const shapeLayer: Layer = { ...makeLayer('s1', undefined, 0), kind: 'shape', fit: 'none', shape: { ...shape } };
+    resolveLayersMock.mockReturnValue([shapeLayer]);
+    const image = document.createElement('canvas');
+    image.width = 400;
+    image.height = 400;
+    const shapeRasterizer: ShapeRasterizer = {
+      rasterize: vi.fn(() => image),
+      measure: vi.fn(() => ({ width: 400, height: 400 })),
+      dispose: vi.fn(),
+    };
+    const provider = makeProvider(new Map());
+    const compositor = makeCompositor();
+
+    const drawn = await renderFrame(
+      compositor,
+      makeProject([]),
+      0,
+      provider,
+      { scale: 1, exact: true },
+      undefined,
+      shapeRasterizer,
+    );
+
+    expect(shapeRasterizer.rasterize).toHaveBeenCalledWith(expect.objectContaining({ shape: 'circle', width: 400 }));
+    expect(drawn).toHaveLength(1);
+    expect(drawn[0]).toMatchObject({ clipId: 's1', sourceWidth: 400, sourceHeight: 400 });
+    expect(compositor.calls[0]?.keys).toEqual(['s1']);
+    expect(provider.released).toEqual([]);
+    expect(provider.requested).toEqual([]);
+  });
+
+  it('desenha a forma na ordem de zIndex junto com os quadros de vídeo', async () => {
+    const shapeLayer: Layer = {
+      ...makeLayer('s1', undefined, 1),
+      kind: 'shape',
+      fit: 'none',
+      shape: { shape: 'rectangle', width: 100, height: 50, cornerRadius: 0, fill: '#fff', stroke: '#000', strokeWidth: 0 },
+    };
+    resolveLayersMock.mockReturnValue([makeLayer('c1', 'a1', 0), shapeLayer]);
+    const frame = document.createElement('canvas');
+    const provider = makeProvider(new Map<string, FrameImage | null>([['a1', frame]]));
+    const compositor = makeCompositor();
+    const shapeRasterizer: ShapeRasterizer = {
+      rasterize: () => document.createElement('canvas'),
+      measure: () => ({ width: 1, height: 1 }),
+      dispose: () => undefined,
+    };
+
+    const drawn = await renderFrame(compositor, makeProject([makeAsset('a1')]), 0, provider, { scale: 1, exact: true }, undefined, shapeRasterizer);
+
+    expect(drawn.map((layer) => layer.clipId)).toEqual(['c1', 's1']);
+    expect(compositor.calls[0]?.keys).toEqual(['c1', 's1']);
+  });
+});
+

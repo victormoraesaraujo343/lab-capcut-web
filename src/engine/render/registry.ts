@@ -2,7 +2,7 @@
 import type { ParamValue } from '../../types/effects';
 
 /** Categoria de um efeito registrado. */
-export type EffectCategory = 'filter' | 'effect' | 'transition';
+export type EffectCategory = 'filter' | 'effect' | 'transition' | 'overlay';
 
 /** Especificação de um parâmetro editável de um efeito. */
 export interface EffectParamSpec {
@@ -32,6 +32,9 @@ export interface EffectParamSpec {
  *   `uniform vec3 u_<key>` (color, rgb 0..1) ou `uniform int u_<key>` (select = índice da opção).
  * - Transições ('transition'): `in vec2 v_uv;`, `uniform sampler2D u_from;` (clipe que sai), `uniform sampler2D u_to;`
  *   (clipe que entra), `uniform float u_progress;` (0..1), `uniform vec2 u_resolution;`, parâmetros como acima, `out vec4 outColor;`.
+ * - Sobreposições ('overlay'): sem textura de entrada; `in vec2 v_uv;`, `uniform vec2 u_resolution;` (px do quadro),
+ *   `uniform float u_time;` (segundos desde o início do clipe), parâmetros como acima, `out vec4 outColor;` (pré-multiplicada)
+ *   — o compositor mistura o resultado no quadro com a mistura do clipe (screen/add/normal).
  * Os efeitos rodam em sequência sobre a textura da camada (ping-pong em framebuffers do tamanho da fonte),
  * antes da transformação; transições rodam sobre o quadro inteiro das duas camadas já transformadas.
  */

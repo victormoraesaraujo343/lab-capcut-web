@@ -14,3 +14,4 @@ Copiadas das fontes livres do sistema (Zorin OS / Debian). Todas permitem redist
 - **Liberation Serif** — SIL OFL 1.1 — LiberationSerif-Regular.ttf, LiberationSerif-Bold.ttf
 - **Noto Serif** — SIL OFL 1.1 — NotoSerif-Regular.ttf, NotoSerif-Bold.ttf
 - **Caladea** — Apache 2.0 — Caladea-Regular.ttf, Caladea-Bold.ttf
+- **Ícones Lucide** (lucide-react 1.54.0) — ISC — ícones base das figurinhas, em src/engine/stickers/stickerIcons.generated.ts

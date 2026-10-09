@@ -94,6 +94,7 @@ function clipAsset(assets: Map<string, Asset>, clip: Clip): Asset | undefined {
 function visualKindOf(clip: Clip, asset: Asset | undefined): Layer['kind'] | null {
   if (clip.text) return 'text';
   if (clip.shape) return 'shape';
+  if (clip.overlay) return 'overlay';
   if (asset && (asset.kind === 'video' || asset.kind === 'image' || asset.kind === 'sticker')) {
     return asset.kind;
   }
@@ -156,7 +157,9 @@ export function layerForClipAt(
   const kind = visualKindOf(clip, asset);
   if (kind === null) return null;
   const base = evaluateTransform(clip.transform, clip.keyframes, localMs);
-  const mediaTimeMs = clipMediaTime(clip, localMs, asset?.durationMs);
+  // Imagem animada repete o ciclo: o instante de mídia não é preso à duração do ciclo (o decodificador dá a volta).
+  const stillKind = asset?.kind === 'image' || asset?.kind === 'sticker';
+  const mediaTimeMs = clipMediaTime(clip, localMs, stillKind ? undefined : asset?.durationMs);
   const common = {
     clipId: clip.id,
     mediaTimeMs,
@@ -176,6 +179,29 @@ export function layerForClipAt(
       sourceHeight: 0,
       fit: 'none',
       text: { data: clip.text, reveal: anim.reveal },
+    };
+  }
+  if (clip.shape) {
+    return {
+      ...common,
+      kind: 'shape',
+      transform: base,
+      sourceWidth: 0,
+      sourceHeight: 0,
+      fit: 'none',
+      shape: clip.shape,
+    };
+  }
+  if (clip.overlay) {
+    // Sobreposição: quadro inteiro do projeto, sem asset; o compositor desenha o shader com a mistura do clipe.
+    return {
+      ...common,
+      kind: 'overlay',
+      transform: base,
+      sourceWidth: project.width,
+      sourceHeight: project.height,
+      fit: 'contain',
+      overlay: clip.overlay,
     };
   }
   const matte = matteFor(clip, assets, mediaTimeMs);

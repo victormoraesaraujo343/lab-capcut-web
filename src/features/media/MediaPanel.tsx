@@ -49,7 +49,14 @@ export function MediaPanel({ embedded = false }: MediaPanelProps) {
 
   const activeFolderId = project?.folders.some((folder) => folder.id === selectedFolderId) ? selectedFolderId : null;
   const visibleAssets = useMemo(
-    () => (project === null ? [] : filterAssets(project.assets, query, activeFolderId)),
+    () =>
+      project === null
+        ? []
+        : filterAssets(
+            project.assets.filter((asset) => asset.kind !== 'sticker'),
+            query,
+            activeFolderId,
+          ),
     [project, query, activeFolderId],
   );
 

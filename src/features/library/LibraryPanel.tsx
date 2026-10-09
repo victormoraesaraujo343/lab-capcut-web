@@ -1,7 +1,7 @@
-// Painel esquerdo com abas (Mídia, Áudio, Texto, Efeitos, Transições, Filtros, Legendas): o cabeçalho tem as abas e o corpo mostra a aba ativa.
+// Painel esquerdo com abas (Mídia, Áudio, Texto, Stickers, Efeitos, Transições, Filtros, Legendas): o cabeçalho tem as abas e o corpo mostra a aba ativa.
 
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { ArrowLeftRight, Captions, Film, Music, Palette, Sparkles, Type, type LucideIcon } from 'lucide-react';
+import { ArrowLeftRight, Captions, Film, Music, Palette, Sparkles, Sticker, Type, type LucideIcon } from 'lucide-react';
 import { PanelShell } from '@/features/layout/PanelShell';
 import { MediaPanel } from '@/features/media/MediaPanel';
 import { t } from '@/i18n/pt-BR';
@@ -9,12 +9,13 @@ import { AudioTab } from './AudioTab';
 import { CaptionsTab } from './CaptionsTab';
 import { EffectsTab } from './EffectsTab';
 import { FiltersTab } from './FiltersTab';
+import { StickersTab } from './StickersTab';
 import { TextTab } from './TextTab';
 import { TransitionsTab } from './TransitionsTab';
 import styles from './LibraryPanel.module.css';
 
 /** Identificador de cada aba da biblioteca. */
-export type LibraryTab = 'media' | 'audio' | 'text' | 'effects' | 'transitions' | 'filters' | 'captions';
+export type LibraryTab = 'media' | 'audio' | 'text' | 'stickers' | 'effects' | 'transitions' | 'filters' | 'captions';
 
 /** Aba mostrada quando não há preferência guardada. */
 const DEFAULT_TAB: LibraryTab = 'media';
@@ -30,6 +31,7 @@ const TABS: readonly { id: LibraryTab; icon: LucideIcon; label: string }[] = [
   { id: 'media', icon: Film, label: t.library.tabs.media },
   { id: 'audio', icon: Music, label: t.library.tabs.audio },
   { id: 'text', icon: Type, label: t.library.tabs.text },
+  { id: 'stickers', icon: Sticker, label: t.library.tabs.stickers },
   { id: 'effects', icon: Sparkles, label: t.library.tabs.effects },
   { id: 'transitions', icon: ArrowLeftRight, label: t.library.tabs.transitions },
   { id: 'filters', icon: Palette, label: t.library.tabs.filters },
@@ -139,6 +141,7 @@ export function LibraryPanel() {
           {activeTab === 'media' ? <MediaPanel embedded /> : null}
           {activeTab === 'audio' ? <AudioTab /> : null}
           {activeTab === 'text' ? <TextTab /> : null}
+          {activeTab === 'stickers' ? <StickersTab /> : null}
           {activeTab === 'effects' ? <EffectsTab /> : null}
           {activeTab === 'transitions' ? <TransitionsTab /> : null}
           {activeTab === 'filters' ? <FiltersTab /> : null}

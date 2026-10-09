@@ -1,6 +1,14 @@
 // Provedor de quadros da exportação: roda no worker (sem DOM), decodifica em sequência e entrega clones dos quadros.
 import type { Asset } from '../../types/project';
 import type { FrameImage, FrameProvider } from '../../types/render';
+import {
+  animatedMimeOf,
+  animationFrameAt,
+  canDecodeAnimated,
+  closeAnimatedImage,
+  decodeAnimatedImage,
+  type AnimatedImage,
+} from '../decode/animatedImage';
 import { openAssetSession } from '../decode/decodeSession';
 import type { Session } from '../decode/decodeSession';
 import { decodeTo } from '../decode/decoderFeed';
@@ -14,6 +22,7 @@ const NEAREST_TOLERANCE_FRAMES = 0.5;
 export function createExportFrameProvider(): FrameProvider {
   const videoSessions = new Map<string, Promise<Session>>();
   const bitmaps = new Map<string, Promise<ImageBitmap>>();
+  const animations = new Map<string, Promise<AnimatedImage | null>>();
   let disposed = false;
 
   /** Abre a sessão do vídeo uma única vez; falha vira Error('decode:<id>'). */
@@ -74,10 +83,45 @@ export function createExportFrameProvider(): FrameProvider {
     return decoding;
   }
 
+  /** Lê e decodifica a animação; null se não for animada, sem suporte ou com erro (cai na imagem parada). */
+  async function loadAnimation(asset: Asset, mimeType: string): Promise<AnimatedImage | null> {
+    if (!(await canDecodeAnimated(mimeType))) return null;
+    try {
+      const file = await readFile(asset.opfsPath);
+      return await decodeAnimatedImage(file, mimeType);
+    } catch {
+      return null;
+    }
+  }
+
+  /** Decodifica a animação uma vez por asset; o resultado 'não animada' também fica em cache. */
+  function animationOf(asset: Asset, mimeType: string): Promise<AnimatedImage | null> {
+    const existing = animations.get(asset.id);
+    if (existing !== undefined) return existing;
+    const loading: Promise<AnimatedImage | null> = loadAnimation(asset, mimeType).then((animation) => {
+      if (animation === null) return null;
+      if (disposed || animations.get(asset.id) !== loading) {
+        // Asset fechado ou provedor descartado enquanto decodificava: fecha os quadros aqui.
+        closeAnimatedImage(animation);
+        return null;
+      }
+      return animation;
+    });
+    animations.set(asset.id, loading);
+    return loading;
+  }
+
   /** Obtém o quadro do asset no instante de mídia (exato, pois a exportação anda para frente). */
   async function getFrame(asset: Asset, mediaTimeMs: number): Promise<FrameImage | null> {
     if (disposed) throw new Error('provider-disposed');
-    if (asset.kind === 'image' || asset.kind === 'sticker') return imageBitmap(asset);
+    if (asset.kind === 'image' || asset.kind === 'sticker') {
+      const mimeType = animatedMimeOf(asset.mimeType, asset.opfsPath);
+      if (mimeType !== null) {
+        const animation = await animationOf(asset, mimeType);
+        if (animation !== null && !disposed) return animationFrameAt(animation, mediaTimeMs);
+      }
+      return imageBitmap(asset);
+    }
     if (asset.kind !== 'video') return null;
     return videoFrame(asset, mediaTimeMs);
   }
@@ -94,7 +138,7 @@ export function createExportFrameProvider(): FrameProvider {
     }
   }
 
-  /** Fecha a sessão de vídeo e o bitmap de um asset que saiu do projeto. */
+  /** Fecha a sessão de vídeo, o bitmap e os quadros de animação de um asset que saiu do projeto. */
   function closeAsset(assetId: string): void {
     const session = videoSessions.get(assetId);
     videoSessions.delete(assetId);
@@ -102,6 +146,9 @@ export function createExportFrameProvider(): FrameProvider {
     const bitmap = bitmaps.get(assetId);
     bitmaps.delete(assetId);
     if (bitmap !== undefined) void bitmap.then((image) => image.close(), () => undefined);
+    const animation = animations.get(assetId);
+    animations.delete(assetId);
+    if (animation !== undefined) void animation.then(closeAnimatedImage, () => undefined);
   }
 
   /** Libera todas as sessões, decodificadores e bitmaps; novos pedidos passam a falhar. */
@@ -113,8 +160,12 @@ export function createExportFrameProvider(): FrameProvider {
     for (const bitmap of bitmaps.values()) {
       void bitmap.then((image) => image.close(), () => undefined);
     }
+    for (const animation of animations.values()) {
+      void animation.then(closeAnimatedImage, () => undefined);
+    }
     videoSessions.clear();
     bitmaps.clear();
+    animations.clear();
   }
 
   return { getFrame, prefetch, releaseFrame, closeAsset, dispose };

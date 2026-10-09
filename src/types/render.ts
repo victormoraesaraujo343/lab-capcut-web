@@ -1,6 +1,6 @@
 // Tipos do motor de render: camadas resolvidas, fontes de quadro e compositor.
 // Contrato compartilhado entre composição, decodificação, compositor e prévia/exportação.
-import type { Asset, AssetKind, TextData, Transform } from './project';
+import type { Asset, AssetKind, OverlayData, ShapeData, TextData, Transform } from './project';
 import type { EffectInstance, ParamValue } from './effects';
 
 /** Imagem que o compositor sabe enviar como textura. */
@@ -13,7 +13,7 @@ export interface Layer {
   /** Asset de origem (ausente para texto/forma, que chegam como imagem própria). */
   assetId?: string;
   /** Tipo do asset. */
-  kind: AssetKind | 'text' | 'shape';
+  kind: AssetKind | 'text' | 'shape' | 'overlay';
   /** Instante dentro da mídia original a mostrar, em ms (já considera trim, velocidade e inversão). */
   mediaTimeMs: number;
   /** Instante dentro do clipe (0 = início do clipe), em ms. */
@@ -36,6 +36,10 @@ export interface Layer {
   fit: 'contain' | 'none';
   /** Só para camadas de texto: o conteúdo/estilo e quanto do texto já apareceu (0..1, animação de digitação). */
   text?: { data: TextData; reveal: number };
+  /** Só para camadas de forma: desenhada em canvas 2D (como o texto), tamanho natural = width × height (+ contorno). */
+  shape?: ShapeData;
+  /** Só para camadas de sobreposição: shader procedural de quadro inteiro, desenhado com a mistura indicada (sem imagem de fonte). */
+  overlay?: OverlayData;
   /** Máscara de recorte (efeito 'removeBackground'): quadro de um asset de máscara no mesmo instante de mídia. */
   matte?: { assetId: string; mediaTimeMs: number };
   /**

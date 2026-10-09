@@ -1,5 +1,6 @@
 // Importação de um arquivo de mídia: grava no OPFS, lê metadados, gera miniaturas e forma de onda.
 
+import { animatedMimeOf, probeAnimation } from '@/engine/decode/animatedImage';
 import { MediaImportError } from '@/engine/decode/errors';
 import { detectAssetKind, type ImportableKind } from '@/engine/decode/mediaKind';
 import { readMediaMetadata } from '@/engine/decode/metadata';
@@ -58,6 +59,19 @@ async function tryWaveform(file: File): Promise<number[] | undefined> {
   }
 }
 
+/** Duração de um ciclo de GIF/WebP animado em ms; undefined para imagem parada ou se a medição falhar. */
+async function animationCycleMs(kind: ImportableKind, file: File): Promise<number | undefined> {
+  if (kind !== 'image') return undefined;
+  const mimeType = animatedMimeOf(file.type, file.name);
+  if (mimeType === null) return undefined;
+  try {
+    const timing = await probeAnimation(file, mimeType);
+    return timing === null ? undefined : timing.totalMs;
+  } catch {
+    return undefined;
+  }
+}
+
 /** Apaga a mídia e as miniaturas gravadas de um asset; ignora falhas para não esconder o erro original. */
 async function removeImportedFiles(projectId: string, assetId: string, mediaFile: string): Promise<void> {
   try {
@@ -96,6 +110,7 @@ export async function importOneFile(projectId: string, file: File): Promise<Asse
   try {
     const metadata = await readMediaMetadata(file, kind);
     const visuals = await buildVisuals(kind, file, metadata.durationMs, projectId, assetId, opfsPath);
+    const cycleMs = await animationCycleMs(kind, file);
     const asset: Asset = {
       id: assetId,
       kind,
@@ -103,7 +118,7 @@ export async function importOneFile(projectId: string, file: File): Promise<Asse
       mimeType: file.type,
       opfsPath,
       sizeBytes: file.size,
-      durationMs: metadata.durationMs,
+      durationMs: metadata.durationMs ?? cycleMs,
       width: metadata.width,
       height: metadata.height,
       fps: metadata.fps,

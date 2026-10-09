@@ -5,6 +5,7 @@ import { cropUvRect, layerMatrix } from './matrix';
 import { applyLayerEffects, bindTarget, layerMargin } from './effectPipeline';
 import type { FboEntry, FboPool } from './fboPool';
 import { createFboPool } from './fboPool';
+import { drawOverlayLayer } from './overlayPass';
 import { ensureEffectsRegistered } from './registerAll';
 import { getEffect, type EffectDefinition } from './registry';
 import { createProgramCache, parseHexColor, setEffectUniforms, type ProgramCache } from './programCache';
@@ -120,6 +121,10 @@ function drawFrame(
   for (const layer of layers) {
     if (layer.transition) {
       drawTransition(ctx, layer);
+      continue;
+    }
+    if (layer.overlay) {
+      drawOverlayLayer(gl, res, layer, options);
       continue;
     }
     const image = images.get(layer.clipId);

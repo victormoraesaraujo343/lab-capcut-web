@@ -1,5 +1,6 @@
 // Registro único de todos os efeitos, filtros e transições (chamado pelo compositor na criação).
 import { registerEffects } from './effects';
+import { registerOverlays } from './overlays';
 import { registerFilters } from './filters';
 import { registerTransitions } from './transitions';
 
@@ -12,5 +13,6 @@ export function ensureEffectsRegistered(): void {
   registerEffects();
   registerFilters();
   registerTransitions();
+  registerOverlays();
   registered = true;
 }

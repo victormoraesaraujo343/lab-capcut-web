@@ -5,6 +5,7 @@ import { setTransition } from '@/stores/transitionCommands';
 import { msToPx, pxToMs } from '@/engine/timeline/snap';
 import { adjacentClipAfter, transitionSpan, type TransitionSpan } from '@/engine/render/transitionWindow';
 import { TRANSITION_DRAG_MIME, endTransitionDrag, readTransitionDrop } from '@/features/library/transitionDrag';
+import { carriesSticker, dropSticker, readStickerDrop } from '@/features/library/stickerDrag';
 import { clipEndMs, type Clip, type Track } from '@/types';
 import { t } from '@/i18n/pt-BR';
 import { TRACK_ROW_HEIGHT } from './layout';
@@ -140,6 +141,13 @@ export function TrackRow({ track, trackIndex, zoom }: TrackRowProps) {
 
   /** Arrasto de transição destaca o corte sob o ponteiro; o resto segue para a soltura de mídia. */
   function handleDragOver(event: ReactDragEvent<HTMLDivElement>): void {
+    if (carriesSticker(event.dataTransfer)) {
+      if (!track.locked) {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'copy';
+      }
+      return;
+    }
     if (!carriesTransition(event)) {
       drop.onDragOver(event);
       return;
@@ -161,6 +169,14 @@ export function TrackRow({ track, trackIndex, zoom }: TrackRowProps) {
 
   /** Põe a transição no corte mais próximo ao soltar; sem corte perto, ou em trilha que não aceita, não faz nada. */
   function handleDrop(event: ReactDragEvent<HTMLDivElement>): void {
+    const stickerId = readStickerDrop(event.dataTransfer);
+    if (stickerId !== null) {
+      if (track.locked) return;
+      event.preventDefault();
+      const preferred = track.kind === 'sticker' ? track.id : undefined;
+      dropSticker(stickerId, Math.max(0, Math.round(pxToMs(pointerPx(event), zoom))), preferred);
+      return;
+    }
     const type = readTransitionDrop(event.dataTransfer);
     if (type === null) {
       drop.onDrop(event);
