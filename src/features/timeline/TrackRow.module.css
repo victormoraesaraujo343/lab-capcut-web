@@ -1,0 +1,39 @@
+/* Faixa de uma trilha: fundo sutil, listras quando travada, fantasmas de arrasto e linha de encaixe. */
+
+.row {
+  position: relative;
+  width: 100%;
+  background: var(--bg-panel-alt);
+  border-radius: 4px;
+}
+
+.locked {
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent 0 6px,
+    rgb(127 127 127 / 0.16) 6px 12px
+  );
+}
+
+.ghost,
+.dropGhost {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  box-sizing: border-box;
+  border: 2px dashed var(--accent);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  pointer-events: none;
+  z-index: 4;
+}
+
+.snapLine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--accent);
+  pointer-events: none;
+  z-index: 5;
+}

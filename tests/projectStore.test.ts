@@ -7,6 +7,7 @@ import { deleteEntry, revokeObjectUrl } from '@/engine/storage/opfs';
 import { defaultAudioFx, defaultSpeed, defaultTransform, type Asset, type Clip } from '@/types';
 import { useProjectStore } from '@/stores/projectStore';
 import { cancelPendingSave, flushSave } from '@/stores/projectPersistence';
+import { useTimelineStore } from '@/stores/timelineStore';
 
 vi.mock('@/engine/storage/opfs', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/engine/storage/opfs')>()),
@@ -81,6 +82,7 @@ describe('projectStore', () => {
     resetDbForTests();
     await deleteDatabase();
     useProjectStore.setState(useProjectStore.getInitialState());
+    useTimelineStore.setState(useTimelineStore.getInitialState());
   });
 
   it('createNewProject cria, abre e lista o projeto', async () => {
@@ -186,6 +188,32 @@ describe('projectStore', () => {
     expect(after.tracks[0]?.clips.map((c) => c.id)).toEqual(['c2']);
     expect(deleteEntry).toHaveBeenCalledWith(`projects/${project.id}/media/a1.mp4`);
     expect(deleteEntry).toHaveBeenCalledWith(`projects/${project.id}/thumbs/a1`);
+  });
+
+  it('removeAsset zera o histórico e a seleção: desfazer não traz clipe com asset removido', async () => {
+    await useProjectStore.getState().createNewProject('Órfãos');
+    const project = openedProject();
+    const trackId = project.tracks[0]?.id ?? '';
+    useProjectStore.setState({ project: { ...project, assets: [makeAsset(project.id, 'a1')] } });
+    useTimelineStore.getState().edit(
+      'add',
+      (tracks) => tracks.map((t) => (t.id === trackId ? { ...t, clips: [makeClip('c1', trackId, 'a1', 0)] } : t)),
+      ['c1'],
+    );
+    useTimelineStore.getState().edit('mute', (tracks) => tracks.map((t) => ({ ...t, muted: true })));
+
+    useTimelineStore.getState().setClipboard({
+      items: [{ clip: makeClip('c1', trackId, 'a1', 0), trackId, trackKind: 'video', offsetMs: 0 }],
+    });
+
+    await useProjectStore.getState().removeAsset('a1');
+    expect(useTimelineStore.getState().history.past).toHaveLength(0);
+    expect(useTimelineStore.getState().selectedClipIds).toEqual([]);
+    expect(useTimelineStore.getState().clipboard).toBeNull();
+
+    useTimelineStore.getState().undo();
+    const clips = openedProject().tracks.flatMap((t) => t.clips);
+    expect(clips.some((c) => c.assetId === 'a1')).toBe(false);
   });
 
   it('salva ao fechar e traz os assets de volta ao reabrir', async () => {

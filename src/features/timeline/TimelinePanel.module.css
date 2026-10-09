@@ -1,0 +1,93 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  color: var(--text);
+  font-size: var(--font-size-sm);
+}
+
+.area {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.topRow {
+  display: flex;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.corner {
+  flex-shrink: 0;
+  background: var(--bg-panel-alt);
+  border-right: 1px solid var(--border);
+}
+
+.lower {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.headers {
+  flex-shrink: 0;
+  overflow: hidden;
+  border-right: 1px solid var(--border);
+}
+
+.headersInner {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.viewport {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  background: var(--bg-panel);
+}
+
+.content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.tracks {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+
+.marquee {
+  position: absolute;
+  display: none;
+  z-index: 2;
+  box-sizing: border-box;
+  pointer-events: none;
+  border: 1px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+.empty {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  color: var(--text-faint);
+  text-align: center;
+  pointer-events: none;
+}

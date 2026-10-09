@@ -24,6 +24,8 @@ export interface PlaybackState {
   toggleLoop: () => void;
   /** Define a qualidade da prévia. */
   setQuality: (q: PreviewQuality) => void;
+  /** Anda um quadro para trás (-1) ou para frente (1), com mínimo 0. */
+  stepFrame: (direction: -1 | 1, fps: number) => void;
 }
 
 /** Hook com o estado e as ações da reprodução. */
@@ -44,4 +46,9 @@ export const usePlaybackStore = create<PlaybackState>()((set) => ({
   toggleLoop: () => set((state) => ({ loop: !state.loop })),
   // Define a qualidade da prévia.
   setQuality: (q) => set({ quality: q }),
+  // Anda um quadro (1000 / fps ms) sem ir abaixo de zero; fps inválido não faz nada.
+  stepFrame: (direction, fps) => {
+    if (!(fps > 0)) return;
+    set((state) => ({ currentTimeMs: Math.max(0, state.currentTimeMs + direction * (1000 / fps)) }));
+  },
 }));

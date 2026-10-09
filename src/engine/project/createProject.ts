@@ -1,6 +1,7 @@
 // Fábrica de projetos e trilhas novos, com valores padrão do editor.
 
 import type { Project, Track, TrackKind } from '@/types';
+import { t } from '@/i18n/pt-BR';
 
 /** Gera um identificador único (UUID v4). */
 export function createId(): string {
@@ -31,7 +32,10 @@ export function createProject(name: string): Project {
     fps: 30,
     aspectRatio: '16:9',
     durationMs: 0,
-    tracks: [createTrack('video', 'Vídeo 1'), createTrack('audio', 'Áudio 1')],
+    tracks: [
+      createTrack('video', `${t.timeline.trackKinds.video} 1`),
+      createTrack('audio', `${t.timeline.trackKinds.audio} 1`),
+    ],
     assets: [],
     folders: [],
     markers: [],

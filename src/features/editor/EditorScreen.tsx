@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react';
-import { Rows3, SlidersHorizontal, type LucideIcon } from 'lucide-react';
+import { SlidersHorizontal, type LucideIcon } from 'lucide-react';
 import { t } from '../../i18n/pt-BR';
 import { runWithToast, useProjectStore, useUiStore } from '../../stores';
 import { TopBar } from '../layout/TopBar';
 import { PanelShell } from '../layout/PanelShell';
 import { MediaPanel } from '@/features/media/MediaPanel';
+import { TimelinePanel } from '@/features/timeline/TimelinePanel';
 import { ResizeHandle } from '../../components/ResizeHandle';
 import styles from './EditorScreen.module.css';
 
@@ -114,9 +115,7 @@ export function EditorScreen() {
       </Cell>
 
       <Cell className={styles.timeline}>
-        <PanelShell title={t.panels.timeline}>
-          <EmptyState icon={Rows3} text={t.timeline.empty} />
-        </PanelShell>
+        <TimelinePanel />
       </Cell>
     </div>
   );

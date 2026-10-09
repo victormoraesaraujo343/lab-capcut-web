@@ -11,7 +11,7 @@ import {
   saveProject,
   type ProjectSummary,
 } from '@/engine/storage/db';
-import type { Asset, Project } from '@/types';
+import { computeProjectDuration, type Asset, type Project, type Track } from '@/types';
 import {
   importSequentially,
   removeAssetFiles,
@@ -44,6 +44,8 @@ export interface ProjectState {
   setProject: (p: Project | null) => void;
   /** Renomeia o projeto aberto e agenda o salvamento; não faz nada sem projeto. */
   renameProject: (name: string) => void;
+  /** Troca as trilhas do projeto aberto, recalcula a duração e agenda o salvamento. */
+  setTracks: (tracks: Track[]) => void;
   /** Recarrega a lista de projetos do banco. */
   loadProjects: () => Promise<void>;
   /** Cria um projeto, salva e o abre. */
@@ -106,6 +108,10 @@ export const useProjectStore = create<ProjectState>()((set, get) => {
 
     // Renomeia o projeto aberto e agenda o salvamento.
     renameProject: (name) => updateProject((p) => ({ ...p, name })),
+
+    // Troca as trilhas e recalcula a duração do projeto.
+    setTracks: (tracks) =>
+      updateProject((p) => ({ ...p, tracks, durationMs: computeProjectDuration(tracks) })),
 
     // Recarrega a lista de projetos.
     loadProjects: () => refreshList(),

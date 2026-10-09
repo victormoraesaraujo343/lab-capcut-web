@@ -6,8 +6,8 @@ Orquestrador: Opus 5.5. Agentes: Haiku (tarefas), Sonnet (revisor).
 |---|---|---|
 | 1 | Esqueleto e tipos | ✅ passou |
 | 2 | Importar mídia | ✅ passou |
-| 3 | Linha do tempo | em andamento |
-| 4 | Prévia e reprodução | pendente |
+| 3 | Linha do tempo | ✅ passou |
+| 4 | Prévia e reprodução | em andamento |
 | 5 | Exportar | pendente |
 | 6 | Texto | pendente |
 | 7 | Transições, filtros, efeitos, velocidade | pendente |
@@ -31,3 +31,9 @@ Orquestrador: Opus 5.5. Agentes: Haiku (tarefas), Sonnet (revisor).
 - Decisão: mídia por projeto em `projects/<id>/media|thumbs`; duplicar copia a pasta e reescreve caminhos.
 - Correções pós-revisão: importa direto na pasta, timeouts nas miniaturas, avisos de erro (toaster), soltar arquivo fora do painel não sai do app.
 - Lição: depois de vários agentes editarem ao mesmo tempo, o servidor de dev pode ficar com módulo velho → reiniciar o preview.
+- Etapa 3 passou (revisor rodada 2: PASSA; 377 testes). Navegador: 5 mídias soltas com ímã, arrastar com mouse, lâmina, reordenar com inserção, Ctrl+Z voltando cada passo.
+- Decisão: inserir empurrando = segurar **Alt** (Ctrl fica pra seleção múltipla). Shift+Delete = excluir fechando espaço.
+- Decisão: histórico = patches por trilha (referências imutáveis, sem cópia profunda). Remover mídia zera o histórico (evita desfazer ressuscitar clipe órfão).
+- Contrato de medidas da timeline em `src/features/timeline/layout.ts` (escrito pelo orquestrador).
+- ⚠️ Ocorrência: arquivos do OPFS do 1º projeto de teste sumiram (pastas ficaram). Não reproduzi com o app; suspeita de agente usando o navegador. Regra nova nas tarefas: agentes NÃO usam navegador. Vigiar.
+- Menor pendente: miniaturas na timeline são 1 por slot de ~16:9 px, não por intervalo de 2s (ok por ora).

@@ -1,0 +1,131 @@
+/* Clipe na trilha: retângulo com raio 4px, cor por tipo, rótulo no topo, miniaturas e onda. */
+
+.clip {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  min-width: 2px;
+  box-sizing: border-box;
+  border-radius: 4px;
+  overflow: hidden;
+  color: var(--on-clip);
+  box-shadow: inset 0 0 0 2px transparent;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.kindVideo { background-color: var(--clip-video); }
+.kindAudio { background-color: var(--clip-audio); }
+.kindText { background-color: var(--clip-text); }
+.kindSticker { background-color: var(--clip-sticker); }
+.kindEffect { background-color: var(--clip-effect); }
+
+.selected {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.dimmed {
+  opacity: 0.35;
+}
+
+.hiddenTrack {
+  opacity: 0.4;
+}
+
+.locked {
+  cursor: not-allowed;
+  filter: saturate(0.4);
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgb(0 0 0 / 0.18) 0 6px,
+    transparent 6px 12px
+  );
+}
+
+.blade {
+  cursor: crosshair;
+}
+
+.label {
+  position: absolute;
+  top: 2px;
+  left: 6px;
+  max-width: calc(100% - 12px);
+  z-index: 2;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: rgb(0 0 0 / 0.35);
+  color: #fff;
+  font-size: 11px;
+  line-height: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+.thumbs {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.slot {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  overflow: hidden;
+}
+
+.thumbImg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.waveBox {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.wave {
+  position: absolute;
+  top: 0;
+  display: block;
+}
+
+.handleStart,
+.handleEnd {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 3;
+  cursor: ew-resize;
+}
+
+.handleStart { left: 0; }
+.handleEnd { right: 0; }
+
+.handleStart:hover,
+.handleEnd:hover {
+  background: rgb(255 255 255 / 0.35);
+}
+
+.bladeLine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--accent);
+  pointer-events: none;
+  z-index: 4;
+}

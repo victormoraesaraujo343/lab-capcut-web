@@ -6,6 +6,8 @@ import { IconButton } from '@/components/IconButton';
 import { t } from '@/i18n/pt-BR';
 import { formatDuration } from '@/utils/time';
 import type { Asset, AssetKind, Folder } from '@/types/project';
+import { IMAGE_DEFAULT_DURATION_MS } from '@/engine/timeline/constants';
+import { setDraggedAsset } from '@/features/timeline/dragState';
 import { useObjectUrl } from './useObjectUrl';
 import styles from './MediaCard.module.css';
 
@@ -43,6 +45,15 @@ export function MediaCard({ asset, folders, onMove, onRemove }: MediaCardProps) 
   function handleDragStart(event: DragEvent<HTMLDivElement>) {
     event.dataTransfer.setData(ASSET_DRAG_MIME, asset.id);
     event.dataTransfer.effectAllowed = 'copy';
+    setDraggedAsset({
+      id: asset.id,
+      durationMs: asset.durationMs ?? IMAGE_DEFAULT_DURATION_MS,
+      kind: asset.kind,
+    });
+  }
+
+  function handleDragEnd() {
+    setDraggedAsset(null);
   }
 
   function handleMenuBlur(event: FocusEvent<HTMLDivElement>) {
@@ -66,7 +77,7 @@ export function MediaCard({ asset, folders, onMove, onRemove }: MediaCardProps) 
 
   return (
     <li className={styles.card} data-menu-open={menuOpen ? 'true' : undefined}>
-      <div className={styles.surface} draggable tabIndex={0} onDragStart={handleDragStart}>
+      <div className={styles.surface} draggable tabIndex={0} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div className={styles.thumb}>
           {thumbUrl !== undefined ? (
             <img className={styles.image} src={thumbUrl} alt="" draggable={false} />

@@ -10,3 +10,5 @@ export type { UiState } from './uiStore';
 export type { ImportErrorItem, ImportProgress } from './projectStore';
 export { useToastStore, runWithToast } from './toastStore';
 export type { Toast, ToastKind, ToastState } from './toastStore';
+export type { TimelineTool } from './timelineStore';
+export * from './timelineCommands';
