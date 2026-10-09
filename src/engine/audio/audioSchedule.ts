@@ -75,8 +75,9 @@ export function clipGainAt(clip: Clip, localMs: number): number {
   return volumeAt(clip, localMs) * factor;
 }
 
-/** Volume do clipe no instante local: o valor do keyframe 'volume' se houver, senão o volume fixo. */
+/** Volume do clipe no instante local: 0 se silenciado; senão o keyframe 'volume' se houver, ou o volume fixo. */
 export function volumeAt(clip: Clip, localMs: number): number {
+  if (clip.audio.muted === true) return 0;
   return Math.max(0, evaluateNumber(clip.keyframes, 'volume', localMs, clip.volume));
 }
 
@@ -87,7 +88,7 @@ export function speedAtLocal(clip: Clip, localMs: number): number {
 }
 
 function segmentFor(clip: Clip, assets: Map<string, Asset>, fromTimelineMs: number): ScheduledSegment | null {
-  if (clip.reversed || clip.assetId === undefined) {
+  if (clip.reversed || clip.assetId === undefined || clip.audioDetached === true) {
     return null;
   }
   const asset = assets.get(clip.assetId);

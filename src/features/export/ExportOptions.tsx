@@ -1,5 +1,6 @@
 // Campos de configuração da exportação: nome, formato, resolução, fps, qualidade e tamanho estimado.
 import { t } from '../../i18n/pt-BR';
+import { useProjectStore } from '../../stores/projectStore';
 import type { ExportFormat, ExportSettings, ResolutionPreset, BitratePreset } from '../../types/export';
 import styles from './ExportDialog.module.css';
 
@@ -116,6 +117,10 @@ export function ExportOptions({
 }: ExportOptionsProps) {
   const audioOnly = settings.format === 'wav' || settings.format === 'mp3';
   const gif = settings.format === 'gif';
+  // Falas sintéticas tocam na prévia mas não entram no arquivo: avisa quando o projeto tem alguma.
+  const hasSpeech = useProjectStore(
+    (state) => state.project?.tracks.some((track) => track.clips.some((clip) => clip.tts !== undefined)) ?? false,
+  );
   const fpsOptions: ReadonlyArray<{ value: number; label: string }> = gif
     ? [{ value: GIF_FPS, label: String(GIF_FPS) }]
     : FPS_OPTIONS;
@@ -210,6 +215,7 @@ export function ExportOptions({
       {showGifLimit && <p className={styles.notice} role="note">{t.export.gifLimit}</p>}
       {showFallback && <p className={styles.notice} role="note">{t.export.fallbackNotice}</p>}
       {showLargeFileWarning && <p className={styles.notice} role="note">{t.export.largeFileWarning}</p>}
+      {hasSpeech && <p className={styles.notice} role="note">{t.tts.exportNotice}</p>}
     </div>
   );
 }

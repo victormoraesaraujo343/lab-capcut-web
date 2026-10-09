@@ -24,6 +24,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { IconButton } from '@/components/IconButton';
+import { RecordButton } from '@/features/recording/RecordButton';
 import { canRedo, canUndo } from '@/engine/timeline/history';
 import { t } from '@/i18n/pt-BR';
 import {
@@ -257,6 +258,7 @@ export function TimelineToolbar() {
       </div>
 
       <div className={styles.center}>
+        <RecordButton />
         <PlayButton />
         <TimecodeReadout />
       </div>

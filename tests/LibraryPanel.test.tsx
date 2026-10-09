@@ -81,10 +81,10 @@ describe('LibraryPanel', () => {
     render(<LibraryPanel />);
 
     fireEvent.keyDown(tab(t.library.tabs.media), { key: 'ArrowRight' });
-    expect(tab(t.library.tabs.text)).toHaveAttribute('aria-selected', 'true');
-    expect(tab(t.library.tabs.text)).toHaveFocus();
+    expect(tab(t.library.tabs.audio)).toHaveAttribute('aria-selected', 'true');
+    expect(tab(t.library.tabs.audio)).toHaveFocus();
 
-    fireEvent.keyDown(tab(t.library.tabs.text), { key: 'ArrowLeft' });
+    fireEvent.keyDown(tab(t.library.tabs.audio), { key: 'ArrowLeft' });
     expect(tab(t.library.tabs.media)).toHaveAttribute('aria-selected', 'true');
   });
 

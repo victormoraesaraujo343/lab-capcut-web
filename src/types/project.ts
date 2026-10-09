@@ -177,8 +177,25 @@ export interface AudioFx {
   fadeOutMs: number;
   /** Ativa redução de ruído. */
   denoise: boolean;
-  /** Efeito de voz aplicado ao áudio. */
+  /** Clipe silenciado (vale por cima do volume e dos keyframes de volume). */
+  muted?: boolean;
+  /**
+   * Efeito de voz aplicado ao áudio (mesma cadeia na prévia e na exportação).
+   * type: 'pitch' (params.semitones -12..12) | 'echo' (delayMs, feedback, mix) | 'reverb' (roomSize, mix)
+   * | 'robot' (frequency, mix) | 'telephone' (drive).
+   */
   voiceEffect?: EffectInstance;
+}
+
+/** Fala sintética (texto pra fala com speechSynthesis do navegador). Toca na prévia; o navegador não permite gravar essa voz no arquivo. */
+export interface TtsData {
+  text: string;
+  /** voiceURI da SpeechSynthesisVoice escolhida (vazio = primeira voz pt-BR disponível). */
+  voiceURI: string;
+  /** Velocidade da fala 0.5..2. */
+  rate: number;
+  /** Tom da fala 0..2. */
+  pitch: number;
 }
 
 /** Clipe posicionado numa trilha. */
@@ -225,6 +242,10 @@ export interface Clip {
   freezeFrameMs?: number;
   /** Clipes com o mesmo groupId são editados juntos. */
   groupId?: string;
+  /** Clipe de vídeo cujo áudio foi separado para um clipe de áudio próprio: o áudio deste clipe fica mudo. */
+  audioDetached?: boolean;
+  /** Clipe de fala sintética (em trilha de áudio, sem assetId). */
+  tts?: TtsData;
 }
 
 /** Trilha da timeline. */

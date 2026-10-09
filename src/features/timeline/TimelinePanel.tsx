@@ -6,6 +6,7 @@ import { addAssetToNewTrack, usePlaybackStore, useProjectStore, useTimelineStore
 import { pxToMs } from '../../engine/timeline/snap';
 import type { Track } from '@/types';
 import { ASSET_DRAG_MIME, RULER_HEIGHT, TRACK_GAP, TRACK_HEADER_WIDTH, trackIndexAtY } from './layout';
+import { MarkerLines } from './MarkerLines';
 import { Playhead } from './Playhead';
 import { TimeRuler } from './TimeRuler';
 import { TrackHeader } from './TrackHeader';
@@ -161,6 +162,7 @@ export function TimelinePanel() {
                   ))}
                   <div ref={marqueeRef} className={styles.marquee} />
                 </div>
+                <MarkerLines />
               </div>
             </div>
             {!hasProject || !hasClips ? <p className={styles.empty}>{t.timeline.empty}</p> : null}

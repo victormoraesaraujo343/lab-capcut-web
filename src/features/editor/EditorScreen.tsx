@@ -6,6 +6,7 @@ import { ExportDialog } from '../export/ExportDialog';
 import { InspectorPanel } from '@/features/inspector/InspectorPanel';
 import { LibraryPanel } from '@/features/library/LibraryPanel';
 import { TimelinePanel } from '@/features/timeline/TimelinePanel';
+import { RecordingOverlay } from '@/features/recording/RecordingOverlay';
 import { PreviewPanel } from '@/features/preview/PreviewPanel';
 import { TransformOverlay } from '@/features/preview/TransformOverlay';
 import { disposeTranscriber } from '@/engine/captions/transcribeClient';
@@ -168,6 +169,7 @@ export function EditorScreen() {
           <TimelinePanel />
         </Cell>
       </div>
+      <RecordingOverlay />
       {exportOpen && <ExportDialog project={project} onClose={() => setExportOpen(false)} />}
     </>
   );

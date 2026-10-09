@@ -71,6 +71,7 @@ class FakeOfflineAudioContext {
   sources: FakeSource[] = [];
   envelopeCalls: EnvelopeCall[] = [];
   decodeCalls = 0;
+  created: string[] = [];
   constructor(
     public numberOfChannels: number,
     public length: number,
@@ -85,7 +86,17 @@ class FakeOfflineAudioContext {
   createBuffer(channels: number, length: number): FakeCreatedBuffer {
     return createdBufferFake(channels, length);
   }
+  createDelay(): FakeEffectNode {
+    return fakeEffectNode('delay', this.created);
+  }
+  createBiquadFilter(): FakeEffectNode {
+    return fakeEffectNode('biquad', this.created);
+  }
+  createDynamicsCompressor(): FakeEffectNode {
+    return fakeEffectNode('compressor', this.created);
+  }
   createBufferSource(): FakeSource {
+    this.created.push('source');
     const source: FakeSource = {
       buffer: null,
       playbackRate: { value: 1 },
@@ -103,6 +114,7 @@ class FakeOfflineAudioContext {
     return source;
   }
   createGain(): FakeGain {
+    this.created.push('gain');
     const calls = this.envelopeCalls;
     return {
       gain: {
@@ -131,6 +143,7 @@ class FakeAudioContext {
   state = 'running';
   destination = {};
   envelopeCalls: EnvelopeCall[] = [];
+  created: string[] = [];
   sources: { buffer: unknown; playbackRate: { value: number } }[] = [];
 
   constructor() {
@@ -148,7 +161,17 @@ class FakeAudioContext {
   createBuffer(channels: number, length: number): FakeCreatedBuffer {
     return createdBufferFake(channels, length);
   }
+  createDelay(): FakeEffectNode {
+    return fakeEffectNode('delay', this.created);
+  }
+  createBiquadFilter(): FakeEffectNode {
+    return fakeEffectNode('biquad', this.created);
+  }
+  createDynamicsCompressor(): FakeEffectNode {
+    return fakeEffectNode('compressor', this.created);
+  }
   createBufferSource() {
+    this.created.push('source');
     const source = {
       buffer: null as unknown,
       playbackRate: { value: 1 },
@@ -161,6 +184,7 @@ class FakeAudioContext {
     return source;
   }
   createGain() {
+    this.created.push('gain');
     const calls = this.envelopeCalls;
     return {
       gain: {
@@ -183,6 +207,39 @@ vi.stubGlobal('AudioContext', FakeAudioContext);
 
 /** Buffer decodificado falso da prévia: 2 s a 1 kHz, mono, com amostras reais. */
 const previewBuffer = fakeDecodedBuffer(2000, 1000);
+
+/** Nó de efeito falso (atraso, filtro, compressor): aceita os parâmetros que a cadeia ajusta. */
+interface FakeEffectNode {
+  type: string;
+  gain: { value: number };
+  delayTime: { value: number };
+  frequency: { value: number };
+  threshold: { value: number };
+  knee: { value: number };
+  ratio: { value: number };
+  attack: { value: number };
+  release: { value: number };
+  connect: () => void;
+  disconnect: () => void;
+}
+
+/** Cria um nó de efeito falso e registra o tipo na lista de criados. */
+function fakeEffectNode(kind: string, created: string[]): FakeEffectNode {
+  created.push(kind);
+  return {
+    type: '',
+    gain: { value: 1 },
+    delayTime: { value: 0 },
+    frequency: { value: 0 },
+    threshold: { value: 0 },
+    knee: { value: 0 },
+    ratio: { value: 0 },
+    attack: { value: 0 },
+    release: { value: 0 },
+    connect: () => undefined,
+    disconnect: () => undefined,
+  };
+}
 
 /** Buffer criado por createBuffer nos contextos falsos: registra os canais copiados. */
 interface FakeCreatedBuffer {
@@ -715,5 +772,52 @@ describe('trecho esticado no caminho de exportação e de prévia', () => {
     expect(latest?.playbackRate.value).toBe(1);
     expect(latest?.buffer).not.toBe(previewBuffer);
     engine.dispose();
+  });
+});
+
+describe('efeitos de voz e redução de ruído: prévia e exportação', () => {
+  it('prévia e mixagem criam a mesma cadeia de nós (redução de ruído e eco)', async () => {
+    const audio = {
+      ...defaultAudioFx(),
+      denoise: true,
+      voiceEffect: { id: 'v1', type: 'echo', params: { delayMs: 200, feedback: 0.3, mix: 0.5 } },
+    };
+    const project = makeProject(
+      [makeTrack({ id: 't1', kind: 'audio', clips: [makeClip({ id: 'c1', trackId: 't1', durationMs: 1000, audio })] })],
+      [makeAsset('a1', 'audio')],
+    );
+
+    const engine = createPreviewAudioEngine();
+    await engine.play(project, 0);
+    await flushPromises();
+    // O primeiro nó da prévia é o ganho mestre, criado antes de qualquer trecho.
+    const previewKinds = FakeAudioContext.last?.created.slice(1) ?? [];
+    engine.dispose();
+
+    await mixProjectAudio(project, 0, 1000, { sampleRate: 1000 });
+    const offlineKinds = FakeOfflineAudioContext.last?.created ?? [];
+
+    expect(offlineKinds).toEqual(previewKinds);
+    expect(offlineKinds).toContain('biquad');
+    expect(offlineKinds).toContain('compressor');
+    expect(offlineKinds).toContain('delay');
+  });
+
+  it('tom de +12 semitons estica o trecho por 0,5 e toca o dobro, sem mudar a duração', async () => {
+    const audio = {
+      ...defaultAudioFx(),
+      voiceEffect: { id: 'v1', type: 'pitch', params: { semitones: 12 } },
+    };
+    const project = makeProject(
+      [makeTrack({ id: 't1', kind: 'audio', clips: [makeClip({ id: 'c1', trackId: 't1', durationMs: 1000, audio })] })],
+      [makeAsset('a1', 'audio')],
+    );
+
+    await mixProjectAudio(project, 0, 1000, { sampleRate: 1000 });
+    const [first] = FakeOfflineAudioContext.last?.sources ?? [];
+
+    expect(vi.mocked(stretchChannels)).toHaveBeenCalledWith(expect.anything(), 1000, 0.5);
+    expect(first?.playbackRate.value).toBeCloseTo(2, 6);
+    expect(FakeOfflineAudioContext.last?.created).not.toContain('delay');
   });
 });

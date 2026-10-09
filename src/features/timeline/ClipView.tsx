@@ -1,10 +1,11 @@
 // Retângulo de um clipe na trilha: cor por tipo, rótulo, miniaturas ou onda, seleção, arrasto, aparo e lâmina.
 import { memo, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { Type } from 'lucide-react';
+import { Speech, TriangleAlert, Type } from 'lucide-react';
 import { t } from '@/i18n/pt-BR';
 import type { Clip, Track, TrackKind } from '@/types';
 import { MIN_CLIP_MS } from '@/engine/timeline/constants';
 import { msToPx, pxToMs, snapThresholdMs, snapValue } from '@/engine/timeline/snap';
+import { clipHasOwnSound } from '@/stores/audioCommands';
 import { selectClip, splitClipAtTime } from '@/stores/timelineCommands';
 import { useProjectStore } from '@/stores/projectStore';
 import { usePlaybackStore } from '@/stores/playbackStore';
@@ -14,6 +15,7 @@ import { clipLeftPx, clipWidthPx, visibleClipRange } from './clipGeometry';
 import { ClipKeyframes } from './ClipKeyframes';
 import { ClipThumbnails } from './ClipThumbnails';
 import { ClipWaveform } from './ClipWaveform';
+import { FadeHandles } from './FadeHandles';
 import { useClipDrag } from './useClipDrag';
 import { useClipTrim } from './useClipTrim';
 import styles from './ClipView.module.css';
@@ -41,6 +43,15 @@ function textLabel(content: string): string {
   const first = lines[0];
   if (first === undefined) return t.timeline.clip;
   return lines.length > 1 ? `${first}…` : first;
+}
+
+/** Rótulo de um clipe de fala: início do texto, ou o nome genérico se o texto estiver vazio. */
+function speechLabel(text: string): string {
+  const first = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find((line) => line !== '');
+  return first ?? t.tts.clipLabel;
 }
 
 /** Propriedades de um clipe na trilha. */
@@ -100,6 +111,8 @@ export const ClipView = memo(function ClipView({
 
   const speedValue = clip.speed.mode === 'constant' ? clip.speed.value : 1;
   const showSpeed = speedValue !== 1;
+  // Fala sintética não tem fade: a alça some nesses clipes.
+  const showFades = !locked && !blade && clip.tts === undefined && clipHasOwnSound(clip, track, asset);
   const speedLabel = `${t.timeline.speedBadge} ${Number(speedValue.toFixed(2))}x`;
 
   /** Instante, em ms da timeline, sob o ponteiro na lâmina; ímã só no cursor de reprodução. */
@@ -141,7 +154,12 @@ export const ClipView = memo(function ClipView({
   }
 
   const isText = clip.text !== undefined;
-  const label = clip.text ? textLabel(clip.text.content) : (asset?.name ?? t.timeline.clip);
+  const speech = clip.tts;
+  const label = clip.text
+    ? textLabel(clip.text.content)
+    : speech
+      ? speechLabel(speech.text)
+      : (asset?.name ?? t.timeline.clip);
 
   const classes = [
     styles.clip,
@@ -175,10 +193,16 @@ export const ClipView = memo(function ClipView({
       ) : null}
       <span className={styles.label}>
         {isText ? <Type className={styles.icon} size={11} aria-hidden="true" /> : null}
+        {speech ? <Speech className={styles.icon} size={11} aria-hidden="true" /> : null}
         <span className={styles.labelText}>
           {label}
           {showSpeed ? ` · ${speedLabel}` : null}
         </span>
+        {speech ? (
+          <span className={styles.icon} role="img" aria-label={t.tts.exportNotice} title={t.tts.exportNotice}>
+            <TriangleAlert size={11} aria-hidden="true" />
+          </span>
+        ) : null}
       </span>
       {!locked && !blade ? (
         <>
@@ -194,6 +218,7 @@ export const ClipView = memo(function ClipView({
           />
         </>
       ) : null}
+      {showFades ? <FadeHandles clip={shown} zoom={zoom} /> : null}
       <ClipKeyframes clip={shown} zoom={zoom} locked={locked} />
       {blade && bladeX !== null ? <div className={styles.bladeLine} style={{ left: bladeX }} /> : null}
     </div>

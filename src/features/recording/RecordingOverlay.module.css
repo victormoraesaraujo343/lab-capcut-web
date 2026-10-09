@@ -1,0 +1,166 @@
+.countdown {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  pointer-events: none;
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  font-family: var(--font-ui);
+}
+
+.countdownNumber {
+  font-size: 120px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.countdownLabel {
+  font-size: var(--font-size-lg);
+}
+
+.tip {
+  margin-top: var(--space-2);
+  font-size: var(--font-size-sm);
+  opacity: 0.8;
+  max-width: 420px;
+  text-align: center;
+}
+
+.bar {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  background: var(--bg-elevated);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-elevated);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+}
+
+.dot,
+.dotIdle {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--danger);
+  flex-shrink: 0;
+}
+
+.dot {
+  animation: blink 1s ease-in-out infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0.2;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dot {
+    animation: none;
+  }
+}
+
+.label {
+  font-weight: 600;
+}
+
+.time {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.meter {
+  width: 120px;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--bg-hover);
+  overflow: hidden;
+}
+
+.meterFill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 100ms linear;
+}
+
+.stopButton,
+.cancelButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 28px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.stopButton {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+
+.stopButton:focus-visible,
+.cancelButton:focus-visible,
+.closeButton:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.error {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: min(560px, calc(100vw - 32px));
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-elevated);
+  color: var(--text);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-elevated);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-sm);
+}
+
+.errorText {
+  flex: 1;
+}
+
+.closeButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}

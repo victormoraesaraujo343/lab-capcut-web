@@ -4,6 +4,7 @@ import type { Asset, Clip, Project } from '../../types/project';
 import { createAudioBufferCache, type AudioBufferCache } from './audioBufferCache';
 import { computeSegments, type ScheduledSegment } from './audioSchedule';
 import { readyPlaySource, scheduleSegment, trimPassed, type ActiveNode } from './audioNodes';
+import { ensureNoiseGateModule } from './denoise';
 
 /** Folga, em segundos, entre o agendamento e o primeiro som, para dar tempo ao motor de áudio. */
 const START_LEAD_S = 0.05;
@@ -143,6 +144,8 @@ export function createPreviewAudioEngine(): PreviewAudioEngine {
     const assets = new Map<string, Asset>(project.assets.map((asset) => [asset.id, asset] as const));
     const clips = indexClips(project);
     const assetIds = Array.from(new Set(segments.map((segment) => segment.assetId)));
+    // Carrega o portão de ruído (uma vez por contexto) antes de montar cadeias; nunca rejeita.
+    const gateLoaded = ensureNoiseGateModule(context);
     await Promise.all(
       assetIds.map(async (assetId) => {
         const asset = assets.get(assetId);
@@ -150,6 +153,7 @@ export function createPreviewAudioEngine(): PreviewAudioEngine {
           return;
         }
         const buffer = await loadBuffer(cache, asset);
+        await gateLoaded;
         const out = master;
         if (buffer === null || out === null || token !== generation) {
           return;

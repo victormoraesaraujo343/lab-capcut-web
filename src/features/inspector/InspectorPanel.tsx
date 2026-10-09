@@ -6,11 +6,12 @@ import { t } from '@/i18n/pt-BR';
 import { findClip } from '@/engine/timeline/clipOps';
 import { useProjectStore } from '@/stores/projectStore';
 import { useTimelineStore } from '@/stores/timelineStore';
-import type { Clip, Project, TextData } from '@/types';
+import type { Asset, Clip, Project, TextData } from '@/types';
 import { AudioSection } from './AudioSection';
 import { ClipToolsSection } from './ClipToolsSection';
 import { EffectsSection } from './EffectsSection';
 import { FiltersSection } from './FiltersSection';
+import { SpeechSection } from './SpeechSection';
 import { SpeedSection } from './SpeedSection';
 import { TextAnimationSection } from './TextAnimationSection';
 import { TextContentSection } from './TextContentSection';
@@ -107,14 +108,16 @@ interface MediaClipBodyProps {
   visual: boolean;
   /** Clipe com som (vídeo ou áudio). */
   hasSound: boolean;
+  /** Asset do clipe; ausente em clipes de fala sintética. */
+  asset: Asset | undefined;
   tab: MediaTab;
   onTab: (tab: MediaTab) => void;
 }
 
 /** Abas de um clipe de mídia e o conteúdo da aba escolhida; abas sem sentido para o tipo somem. */
-function MediaClipBody({ project, clip, visual, hasSound, tab, onTab }: MediaClipBodyProps) {
+function MediaClipBody({ project, clip, visual, hasSound, asset, tab, onTab }: MediaClipBodyProps) {
   const tabs = MEDIA_TABS.filter((item) => {
-    if (item.id === 'speed') return hasSound;
+    if (item.id === 'speed') return hasSound && clip.tts === undefined;
     if (item.id === 'basic') return true;
     return visual;
   });
@@ -144,7 +147,8 @@ function MediaClipBody({ project, clip, visual, hasSound, tab, onTab }: MediaCli
         {current === 'basic' && (
           <>
             {visual && <TransformSection clip={clip} canvas={{ width: project.width, height: project.height }} />}
-            {hasSound && <AudioSection clip={clip} />}
+            {clip.tts !== undefined && <SpeechSection clip={clip} />}
+            {hasSound && <AudioSection clip={clip} asset={asset} />}
             {clip.transitionOut !== undefined && <TransitionSection clip={clip} />}
           </>
         )}
@@ -185,6 +189,7 @@ export function InspectorPanel() {
           clip={clip}
           visual={!audioOnly}
           hasSound={hasSound}
+          asset={asset}
           tab={mediaTab}
           onTab={setMediaTab}
         />

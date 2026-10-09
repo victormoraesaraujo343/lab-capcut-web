@@ -244,6 +244,13 @@ describe('clipGainAt com keyframes de volume', () => {
     },
   });
 
+  it('clipe silenciado dá ganho zero mesmo com keyframes, e reativar volta ao animado', () => {
+    const muted = { ...keyed, audio: { ...keyed.audio, muted: true } };
+    expect(clipGainAt(muted, 0)).toBe(0);
+    expect(clipGainAt(muted, 1000)).toBe(0);
+    expect(clipGainAt({ ...muted, audio: { ...muted.audio, muted: false } }, 500)).toBeCloseTo(1, 9);
+  });
+
   it('usa o valor interpolado dos keyframes no lugar do volume fixo', () => {
     expect(clipGainAt(keyed, 0)).toBeCloseTo(0.5, 9);
     expect(clipGainAt(keyed, 500)).toBeCloseTo(1, 9);
@@ -253,5 +260,20 @@ describe('clipGainAt com keyframes de volume', () => {
   it('multiplica o volume do keyframe pelo fade', () => {
     const faded = { ...keyed, audio: { ...defaultAudioFx(), fadeInMs: 200 } };
     expect(clipGainAt(faded, 100)).toBeCloseTo(0.6 * 0.5, 9);
+  });
+});
+
+describe('computeSegments com áudio separado', () => {
+  it('ignora o vídeo cujo áudio foi separado, mas toca o clipe de áudio criado', () => {
+    const video = makeClip({ id: 'v', trackId: 'v1', audioDetached: true, groupId: 'g' });
+    const audio = makeClip({ id: 'a', trackId: 'a1', groupId: 'g' });
+    const project = makeProject(
+      [makeTrack({ id: 'v1', kind: 'video', clips: [video] }), makeTrack({ id: 'a1', kind: 'audio', clips: [audio] })],
+      [makeAsset('a1', 'video')],
+    );
+
+    const segments = computeSegments(project, 0);
+
+    expect(segments.map((s) => s.clipId)).toEqual(['a']);
   });
 });

@@ -11,8 +11,8 @@ Orquestrador: Opus 5.5. Agentes: Haiku (tarefas), Sonnet (revisor).
 | 5 | Exportar | ✅ passou |
 | 6 | Texto | ✅ passou |
 | 7 | Transições, filtros, efeitos, velocidade | ✅ passou |
-| 8 | Áudio | em andamento |
-| 9 | Stickers, formas, sobreposições | pendente |
+| 8 | Áudio | ✅ passou |
+| 9 | Stickers, formas, sobreposições | em andamento |
 | 10 | Polimento e Pro liberado | pendente |
 
 ## Decisões e ocorrências
@@ -72,3 +72,7 @@ Orquestrador: Opus 5.5. Agentes: Haiku (tarefas), Sonnet (revisor).
 - Prévia preta com o painel escondido = navegador pausa requestAnimationFrame em aba oculta (normal); pra conferir com painel escondido, chamar renderFrame direto.
 - Corrigidos: manter o tom (WSOLA) num worker com cache por trecho; inverter volta ao trecho original após recarregar (Asset.sourceTrimInMs/sourceSpanMs).
 - Pendências p/ etapa 10: restaurar original de clipe invertido que foi dividido/aparado (espelhar trim); reaproveitar cópia invertida existente; AudioBuffer esticado por contexto em WeakMap; reagendar quando o trecho esticado fica pronto; cancelar pedidos de esticamento obsoletos ao arrastar o aparo; limpar assets gerados órfãos; navigator.storage.persist() + aviso de mídia ausente.
+- Etapa 8 passou (revisor rodada 2: PASSA; 1253 testes). Critério no navegador: microfone simulado (fala sintética num MediaStream) → gravação real do editor (contagem, gravação, importação webm com duração Infinity resolvida) → música com fade in 2 s/out 3 s/50% → MP4 exportado: fade in subindo, narração no lugar certo (correlação 0,71 em 3,00 s), fade out descendo.
+- Portão de ruído (AudioWorklet 'noise-gate', empacotado com `?worker&url`) testado no navegador: ruído −65→−91 dB, voz passa igual.
+- Decisão: texto pra fala = speechSynthesis (como o plano manda) → toca só na prévia; o navegador não deixa gravar essa voz no arquivo — a interface avisa e sugere gravar narração.
+- Pendências p/ etapa 10: ao pausar, cortar a cauda do eco/reverb já montada; portão começa fechado (10–15 ms atenuados após play); marcações de batida fora do desfazer.

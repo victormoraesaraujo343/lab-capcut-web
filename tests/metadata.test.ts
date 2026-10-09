@@ -11,6 +11,30 @@ function stubElement<T extends HTMLMediaElement>(element: T): T {
   return element;
 }
 
+/**
+ * Simula o currentTime de uma gravação do MediaRecorder: a posição longa faz a duração virar `durationAfterSeek`
+ * (ou nada muda, se null). Devolve as posições atribuídas, na ordem.
+ */
+function stubSeek(element: HTMLMediaElement, durationAfterSeek: number | null): { seeks: number[] } {
+  const seeks: number[] = [];
+  let time = 0;
+  Object.defineProperty(element, 'currentTime', {
+    configurable: true,
+    get: () => time,
+    set: (value: number) => {
+      seeks.push(value);
+      time = value;
+      if (value > 1000 && durationAfterSeek !== null) {
+        setTimeout(() => {
+          Object.defineProperty(element, 'duration', { configurable: true, value: durationAfterSeek });
+          element.dispatchEvent(new Event('durationchange'));
+        }, 0);
+      }
+    },
+  });
+  return { seeks };
+}
+
 beforeEach(() => {
   Object.defineProperty(URL, 'createObjectURL', { value: createObjectURL, configurable: true, writable: true });
   Object.defineProperty(URL, 'revokeObjectURL', { value: revokeObjectURL, configurable: true, writable: true });
@@ -86,14 +110,21 @@ describe('readMediaMetadata para vídeo', () => {
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:mock');
   });
 
-  it('rejeita com decode quando a duração é Infinity', async () => {
+  it('rejeita com decode quando a duração continua Infinity depois do seek', async () => {
+    vi.useFakeTimers();
     const video = stubElement(document.createElement('video'));
-    Object.defineProperty(video, 'duration', { value: Number.POSITIVE_INFINITY });
+    Object.defineProperty(video, 'duration', { value: Number.POSITIVE_INFINITY, configurable: true });
+    const { seeks } = stubSeek(video, null);
     vi.spyOn(document, 'createElement').mockReturnValueOnce(video);
     setTimeout(() => video.dispatchEvent(new Event('loadedmetadata')), 0);
     const file = new File(['x'], 'clip.webm', { type: 'video/webm' });
 
-    await expect(readMediaMetadata(file, 'video')).rejects.toMatchObject({ code: 'decode' });
+    const pending = readMediaMetadata(file, 'video');
+    const assertion = expect(pending).rejects.toMatchObject({ code: 'decode' });
+    await vi.advanceTimersByTimeAsync(5000);
+
+    await assertion;
+    expect(seeks).toEqual([1e101, 0]);
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:mock');
   });
 
@@ -111,5 +142,38 @@ describe('readMediaMetadata para vídeo', () => {
     expect(video.pause).toHaveBeenCalled();
     expect(video.hasAttribute('src')).toBe(false);
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:mock');
+  });
+});
+
+describe('readMediaMetadata com duração desconhecida (gravações)', () => {
+  it('pula para o fim, espera a duração real e volta ao início', async () => {
+    const video = stubElement(document.createElement('video'));
+    Object.defineProperty(video, 'duration', { value: Number.POSITIVE_INFINITY, configurable: true });
+    Object.defineProperty(video, 'videoWidth', { value: 640 });
+    Object.defineProperty(video, 'videoHeight', { value: 480 });
+    const { seeks } = stubSeek(video, 4.2);
+    vi.spyOn(document, 'createElement').mockReturnValueOnce(video);
+    setTimeout(() => video.dispatchEvent(new Event('loadedmetadata')), 0);
+    const file = new File(['x'], 'gravacao.webm', { type: 'video/webm' });
+
+    const metadata = await readMediaMetadata(file, 'video');
+
+    expect(metadata).toEqual({ durationMs: 4200, width: 640, height: 480, fps: 30 });
+    expect(seeks).toEqual([1e101, 0]);
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:mock');
+  });
+
+  it('resolve também a duração NaN de um áudio gravado', async () => {
+    const audio = stubElement(document.createElement('audio'));
+    Object.defineProperty(audio, 'duration', { value: Number.NaN, configurable: true });
+    const { seeks } = stubSeek(audio, 12.345);
+    vi.spyOn(document, 'createElement').mockReturnValueOnce(audio);
+    setTimeout(() => audio.dispatchEvent(new Event('loadedmetadata')), 0);
+    const file = new File(['x'], 'narracao.ogg', { type: 'audio/ogg' });
+
+    const metadata = await readMediaMetadata(file, 'audio');
+
+    expect(metadata).toEqual({ durationMs: 12345 });
+    expect(seeks).toEqual([1e101, 0]);
   });
 });

@@ -4,6 +4,7 @@
 import type { MixedAudio } from '../../types/export';
 import type { Asset, Clip, Project } from '../../types/project';
 import { createAudioBufferCache } from './audioBufferCache';
+import { ensureNoiseGateModule } from './denoise';
 import { scheduleSegment, stretchedPlaySource, type PlaySource } from './audioNodes';
 import { computeSegments, type ScheduledSegment } from './audioSchedule';
 
@@ -52,7 +53,11 @@ export async function mixProjectAudio(
   onProgress?.(0);
   const length = Math.ceil(((endMs - startMs) / 1000) * sampleRate);
   const ctx = new OfflineAudioContext(CHANNEL_COUNT, length, sampleRate);
-  const buffers = await decodeSegmentBuffers(ctx, project, segments);
+  // Decodifica os buffers e carrega o portão de ruído antes de montar as cadeias (nunca rejeita).
+  const [buffers] = await Promise.all([
+    decodeSegmentBuffers(ctx, project, segments),
+    ensureNoiseGateModule(ctx),
+  ]);
   throwIfAborted(signal);
   onProgress?.(0.5);
   const clips = indexClips(project);

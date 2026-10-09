@@ -18,6 +18,10 @@ export interface MediaMetadata {
 const COMMON_FPS: readonly number[] = [23.976, 24, 25, 29.97, 30, 50, 59.94, 60];
 const FALLBACK_FPS = 30;
 const DEFAULT_TIMEOUT_MS = 15000;
+/** Tempo máximo, em ms, esperando a duração real de uma gravação sem duração. */
+const UNKNOWN_DURATION_TIMEOUT_MS = 5000;
+/** Posição, em segundos, longe o bastante para o navegador calcular a duração real. */
+const SEEK_TO_END_SECONDS = 1e101;
 
 /** Arredonda uma taxa de quadros medida para o valor comum mais próximo; usa 30 se a medida for inválida. */
 export function snapFps(measured: number): number {
@@ -59,8 +63,37 @@ function waitForMetadata(element: HTMLMediaElement, timeoutMs: number): Promise<
   });
 }
 
-/** Converte a duração do elemento em ms; lança 'decode' se for Infinity ou NaN. */
-function readDurationMs(element: HTMLMediaElement): number {
+/** Espera a duração do elemento ficar finita (por durationchange ou timeupdate); resolve false ao esgotar o tempo. */
+function waitForFiniteDuration(element: HTMLMediaElement, timeoutMs: number): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
+    const finish = (): void => {
+      clearTimeout(timer);
+      element.removeEventListener('durationchange', onProgress);
+      element.removeEventListener('timeupdate', onProgress);
+      resolve(Number.isFinite(element.duration));
+    };
+    const onProgress = (): void => {
+      if (Number.isFinite(element.duration)) finish();
+    };
+    const timer = setTimeout(finish, timeoutMs);
+    element.addEventListener('durationchange', onProgress);
+    element.addEventListener('timeupdate', onProgress);
+    onProgress();
+  });
+}
+
+/** Resolve a duração de gravações do MediaRecorder (Infinity ou NaN): pula para uma posição enorme, espera a duração real e volta ao início. */
+async function resolveUnknownDuration(element: HTMLMediaElement, timeoutMs: number): Promise<void> {
+  if (Number.isFinite(element.duration)) return;
+  element.currentTime = SEEK_TO_END_SECONDS;
+  const resolved = await waitForFiniteDuration(element, timeoutMs);
+  element.currentTime = 0;
+  if (!resolved) throw new MediaImportError('decode');
+}
+
+/** Converte a duração do elemento em ms; antes resolve durações desconhecidas, e lança 'decode' se ainda não for finita. */
+async function readDurationMs(element: HTMLMediaElement): Promise<number> {
+  await resolveUnknownDuration(element, UNKNOWN_DURATION_TIMEOUT_MS);
   const seconds = element.duration;
   if (!Number.isFinite(seconds)) throw new MediaImportError('decode');
   return Math.round(seconds * 1000);
@@ -122,7 +155,7 @@ async function withMediaElement<T extends HTMLMediaElement>(
 /** Lê duração, largura, altura e fps de um vídeo. */
 function readVideoMetadata(file: File, timeoutMs: number): Promise<MediaMetadata> {
   return withMediaElement<HTMLVideoElement>('video', file, timeoutMs, async (video) => {
-    const durationMs = readDurationMs(video);
+    const durationMs = await readDurationMs(video);
     const fps = await measureFps(video, timeoutMs);
     return { durationMs, width: video.videoWidth, height: video.videoHeight, fps };
   });
@@ -131,7 +164,7 @@ function readVideoMetadata(file: File, timeoutMs: number): Promise<MediaMetadata
 /** Lê a duração de um áudio. */
 function readAudioMetadata(file: File, timeoutMs: number): Promise<MediaMetadata> {
   return withMediaElement<HTMLAudioElement>('audio', file, timeoutMs, async (audio) => ({
-    durationMs: readDurationMs(audio),
+    durationMs: await readDurationMs(audio),
   }));
 }
 

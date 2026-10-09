@@ -1,6 +1,7 @@
 // Controlador da reprodução: o relógio de áudio dirige o cursor, os quadros e as edições do projeto.
 import { useProjectStore, usePlaybackStore } from '@/stores';
 import type { Asset, Project } from '@/types';
+import { createTtsPlayer } from '@/engine/tts/ttsPlayer';
 import { getPreviewEngine } from './previewEngine';
 
 /** Espera, em ms, antes de reagendar o áudio depois de uma edição de trilhas (agrupa rajadas). */
@@ -21,6 +22,8 @@ export function startPlaybackController(): () => void {
   let session = 0;
   // true só enquanto o próprio controlador grava a posição; seeks de fora são pedidos do usuário.
   let settingPosition = false;
+  // Falas sintéticas dos clipes de fala: tocam na prévia quando o cursor entra no clipe.
+  const tts = createTtsPlayer();
 
   /** Projeto aberto agora, ou null. */
   const currentProject = (): Project | null => useProjectStore.getState().project;
@@ -65,6 +68,7 @@ export function startPlaybackController(): () => void {
     if (usePlaybackStore.getState().currentTimeMs >= project.durationMs - frameMs) {
       setPosition(0);
     }
+    tts.cancel();
     playFrom(project, usePlaybackStore.getState().currentTimeMs);
     provider.setPlaying(true, 1);
     cancelFrame();
@@ -76,6 +80,7 @@ export function startPlaybackController(): () => void {
     session++;
     cancelFrame();
     audio.stop();
+    tts.cancel();
     provider.setPlaying(false);
   }
 
@@ -96,9 +101,11 @@ export function startPlaybackController(): () => void {
         return;
       }
       setPosition(0);
+      tts.cancel();
       playFrom(project, 0);
     } else {
       setPosition(now);
+      tts.sync(project, now, true);
     }
     frameId = requestAnimationFrame(tick);
   }
@@ -115,6 +122,7 @@ export function startPlaybackController(): () => void {
     // Clique na régua durante a reprodução: o áudio recomeça do novo ponto.
     if (state.isPlaying && !settingPosition && state.currentTimeMs !== prev.currentTimeMs) {
       const project = currentProject();
+      tts.cancel();
       if (project !== null) playFrom(project, state.currentTimeMs);
     }
   });
@@ -148,6 +156,7 @@ export function startPlaybackController(): () => void {
     }
     const wasPlaying = usePlaybackStore.getState().isPlaying;
     endPlayback();
+    tts.cancel();
     if (wasPlaying) usePlaybackStore.getState().pause();
   };
 }

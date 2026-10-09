@@ -1,0 +1,62 @@
+/* Alças de fade no topo do clipe: bolinhas arrastáveis, rampa translúcida sobre a área do fade e tooltip com os segundos. */
+
+.rampIn,
+.rampOut {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgb(0 0 0 / 0.3);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.rampIn {
+  left: 0;
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+}
+
+.rampOut {
+  right: 0;
+  clip-path: polygon(0 0, 100% 0, 100% 100%);
+}
+
+.handle {
+  position: absolute;
+  top: 3px;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  background: var(--on-clip);
+  border: 1px solid var(--accent);
+  cursor: ew-resize;
+  z-index: 3;
+  touch-action: none;
+}
+
+.handle:hover,
+.handle[data-active='true'] {
+  background: var(--accent);
+}
+
+.tip {
+  display: none;
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgb(0 0 0 / 0.75);
+  color: #fff;
+  font-size: 11px;
+  line-height: 14px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.handle:hover .tip,
+.handle[data-active='true'] .tip {
+  display: block;
+}
