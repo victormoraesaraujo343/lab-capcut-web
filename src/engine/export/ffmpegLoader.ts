@@ -2,6 +2,8 @@
 // Também guarda utilitários de arquivo e cancelamento usados pelos exportadores.
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { toBlobURL } from '@ffmpeg/util';
+import { canFetchLocalAssets } from '../env/runtimeEnv';
+import ffmpegWorkerSource from '../workers/ffmpegClass.worker?bundled-source';
 
 let instance: FFmpeg | null = null;
 let pending: Promise<FFmpeg> | null = null;
@@ -9,13 +11,16 @@ let logSink: ((line: string) => void) | undefined;
 
 /** Cria a instância, carrega o núcleo local e liga o registro de log. */
 async function startLoad(): Promise<FFmpeg> {
+  if (!canFetchLocalAssets()) throw new Error('ffmpeg-needs-web-address');
   const ffmpeg = new FFmpeg();
   ffmpeg.on('log', (event) => {
     logSink?.(event.message);
   });
   const coreURL = await toBlobURL(new URL('ffmpeg/ffmpeg-core.js', document.baseURI).href, 'text/javascript');
   const wasmURL = await toBlobURL(new URL('ffmpeg/ffmpeg-core.wasm', document.baseURI).href, 'application/wasm');
-  await ffmpeg.load({ coreURL, wasmURL });
+  // O worker do ffmpeg vai empacotado no app (Blob), pois o caminho "./worker.js" da biblioteca não existe no build clássico.
+  const classWorkerURL = URL.createObjectURL(new Blob([ffmpegWorkerSource], { type: 'text/javascript' }));
+  await ffmpeg.load({ coreURL, wasmURL, classWorkerURL });
   instance = ffmpeg;
   return ffmpeg;
 }

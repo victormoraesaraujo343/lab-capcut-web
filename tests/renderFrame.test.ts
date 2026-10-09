@@ -127,7 +127,7 @@ describe('renderFrame', () => {
     const provider = makeProvider(new Map([['a1', document.createElement('canvas')]]));
     const spy = vi.spyOn(provider, 'getFrame');
     await renderFrame(makeCompositor(), makeProject([makeAsset('a1')]), 0, provider, { scale: 1, exact: false });
-    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ id: 'a1' }), 1000, { exact: false, rate: 2 });
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ id: 'a1' }), 1000, { exact: false, rate: 2, lane: 'c1' });
   });
 
   it('desenha na escala pedida e com fundo padrão', async () => {
@@ -349,7 +349,7 @@ describe('renderFrame', () => {
 
     await renderFrame(compositor, makeProject([makeAsset('a1'), makeAsset('m1')]), 0, provider, { scale: 1, exact: true });
 
-    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ id: 'm1' }), 500, { exact: true, rate: 1 });
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ id: 'm1' }), 500, { exact: true, rate: 1, lane: 'c1:matte' });
     expect(compositor.calls[0]?.keys.sort()).toEqual(['c1', 'c1:matte']);
     expect(provider.released).toEqual([frame, matte]);
   });

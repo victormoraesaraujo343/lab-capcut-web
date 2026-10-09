@@ -1,0 +1,16 @@
+.status {
+  position: absolute;
+  left: 50%;
+  bottom: 2px;
+  transform: translateX(-50%);
+  margin: 0;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--text-faint);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.error {
+  color: var(--danger);
+}

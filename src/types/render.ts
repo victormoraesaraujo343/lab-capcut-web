@@ -66,6 +66,8 @@ export interface FrameRequest {
   exact: boolean;
   /** Velocidade com que a mídia avança na reprodução (speed do clipe); padrão 1. */
   rate?: number;
+  /** Quem pede (ex.: id do clipe): o mesmo vídeo em dois clipes ao mesmo tempo ganha um decodificador por pedinte. */
+  lane?: string;
 }
 
 /** Fornece quadros de mídia por asset e instante. Prévia e exportação usam a mesma interface. */
@@ -73,7 +75,7 @@ export interface FrameProvider {
   /** Devolve o quadro do asset no instante de mídia pedido, ou null se não houver. */
   getFrame(asset: Asset, mediaTimeMs: number, request: FrameRequest): Promise<FrameImage | null>;
   /** Avisa que o cursor está perto deste instante, para pré-carregar quadros ao redor. */
-  prefetch(asset: Asset, mediaTimeMs: number, direction: 1 | -1): void;
+  prefetch(asset: Asset, mediaTimeMs: number, direction: 1 | -1, lane?: string): void;
   /** Solta um quadro devolvido por getFrame (fecha VideoFrame/ImageBitmap quando for dono). */
   releaseFrame(frame: FrameImage): void;
   /** Fecha tudo que pertence a um asset (decodificador, elemento, cache), ex. quando ele sai do projeto. */

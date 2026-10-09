@@ -1,6 +1,7 @@
 // Cliente da estabilização: roda a análise de movimento num worker (um worker por análise, encerrado ao fim ou ao cancelar).
 import type { Asset } from '../../types/project';
 import type { Shift } from './trajectory';
+import StabilizeWorker from '../workers/stabilize.worker?worker&inline';
 
 /** Intervalo entre amostras analisadas, em ms de mídia. */
 const SAMPLE_EVERY_MS = 66;
@@ -50,7 +51,7 @@ export function analyzeClip(
       reject(new DOMException('Estabilização cancelada.', 'AbortError'));
       return;
     }
-    const worker = new Worker(new URL('../workers/stabilize.worker.ts', import.meta.url), { type: 'module' });
+    const worker = new StabilizeWorker();
     const finish = (): void => {
       signal.removeEventListener('abort', onAbort);
       worker.terminate();

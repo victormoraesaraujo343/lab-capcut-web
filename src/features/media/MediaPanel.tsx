@@ -5,10 +5,12 @@ import { Film, Search, Upload } from 'lucide-react';
 import { ACCEPT_ATTRIBUTE } from '@/engine/decode/mediaKind';
 import { PanelShell } from '@/features/layout/PanelShell';
 import { t } from '@/i18n/pt-BR';
-import { useProjectStore } from '@/stores';
+import { runWithToast, useProjectStore } from '@/stores';
+import { relinkAsset, useMissingMediaStore } from '@/stores/relinkCommands';
 import { FolderBar } from './FolderBar';
 import { ImportStatus } from './ImportStatus';
 import { MediaCard, isAssetDrag } from './MediaCard';
+import { MissingMediaNotice } from './MissingMediaNotice';
 import { filterAssets } from './filterAssets';
 import styles from './MediaPanel.module.css';
 
@@ -42,10 +44,14 @@ export function MediaPanel({ embedded = false }: MediaPanelProps) {
   const deleteFolder = useProjectStore((s) => s.deleteFolder);
   const moveAssetToFolder = useProjectStore((s) => s.moveAssetToFolder);
 
+  const missingIds = useMissingMediaStore((s) => s.missingIds);
+
   const [query, setQuery] = useState('');
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [filesDragging, setFilesDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const relinkInputRef = useRef<HTMLInputElement>(null);
+  const relinkTargetRef = useRef<string | null>(null);
 
   const activeFolderId = project?.folders.some((folder) => folder.id === selectedFolderId) ? selectedFolderId : null;
   const visibleAssets = useMemo(
@@ -66,6 +72,23 @@ export function MediaPanel({ embedded = false }: MediaPanelProps) {
     event.target.value = '';
     if (files.length > 0) {
       void importFiles(files, activeFolderId ?? undefined);
+    }
+  }
+
+  /** Abre o seletor de arquivo para localizar a mídia ausente indicada. */
+  function handleLocate(assetId: string) {
+    relinkTargetRef.current = assetId;
+    relinkInputRef.current?.click();
+  }
+
+  /** Recebe o arquivo escolhido e grava-o no caminho da mídia ausente. */
+  function handleRelinkFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    const assetId = relinkTargetRef.current;
+    event.target.value = '';
+    relinkTargetRef.current = null;
+    if (file !== undefined && assetId !== null) {
+      void runWithToast(relinkAsset(assetId, file), t.missingMedia.relinkError);
     }
   }
 
@@ -123,6 +146,10 @@ export function MediaPanel({ embedded = false }: MediaPanelProps) {
     />
   );
 
+  const relinkInput = (
+    <input ref={relinkInputRef} type="file" hidden accept={ACCEPT_ATTRIBUTE} onChange={handleRelinkFile} />
+  );
+
   const searchField = (
     <div className={styles.search}>
       <Search size={14} strokeWidth={1.75} aria-hidden="true" />
@@ -150,12 +177,15 @@ export function MediaPanel({ embedded = false }: MediaPanelProps) {
   const body = (
     <>
       {fileInput}
+      {relinkInput}
 
       {project === null ? (
         embedded ? <div className={styles.content}>{importButton}</div> : null
       ) : (
         <div className={styles.content}>
           {searchRow}
+
+          <MissingMediaNotice />
 
           <FolderBar
             folders={project.folders}
@@ -185,6 +215,8 @@ export function MediaPanel({ embedded = false }: MediaPanelProps) {
                   folders={project.folders}
                   onMove={moveAssetToFolder}
                   onRemove={removeAsset}
+                  missing={missingIds.includes(asset.id)}
+                  onLocate={handleLocate}
                 />
               ))}
             </ul>

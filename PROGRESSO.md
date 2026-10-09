@@ -13,7 +13,7 @@ Orquestrador: Opus 5.5. Agentes: Haiku (tarefas), Sonnet (revisor).
 | 7 | Transições, filtros, efeitos, velocidade | ✅ passou |
 | 8 | Áudio | ✅ passou |
 | 9 | Stickers, formas, sobreposições | ✅ passou |
-| 10 | Polimento e Pro liberado | pendente |
+| 10 | Polimento e Pro liberado | ✅ passou |
 
 ## Decisões e ocorrências
 - 2026-10-09: início. Pasta de trabalho: `capcut-web/` dentro do repo `Experimentos`.
@@ -81,3 +81,8 @@ Orquestrador: Opus 5.5. Agentes: Haiku (tarefas), Sonnet (revisor).
 - Etapa 9 passou (revisor: PASSA após 2 correções — GIF congelava após 1 ciclo; cliques seguidos duplicavam asset; 1364 testes; 115 testes de imagem). Critério no navegador: figurinha clicada na aba Stickers → pontos-chave de posição e rotação → MP4 exportado com a figurinha atravessando e girando; seta e neve nos tempos certos; GIF enviado anima no MP4.
 - Ajustes visuais do orquestrador (vistos em 720p): chuva grossa/quadrada → riscos finos; neve parecia estrela → flocos maiores e suaves; poeira invisível; bokeh agrupado (hash com índices seguidos). Aba Stickers com blocos sobrepostos (painel de altura fixa encolhia os filhos) → aba rola inteira; formas/sobreposições/envio no topo, grade embaixo.
 - Lição: sobreposições/shaders procedurais não dá pra julgar na imagem de teste 320×180 — conferir em 720p.
+- Etapa 10: 10 modelos de projeto (Novo projeto abre a escolha; "Projeto em branco" primeiro); projeto em .zip próprio (STORE, ZIP64, caminhos validados, ids novos na importação); salvamento automático a cada 10 s com instantâneo de recuperação e aviso após travamento; armazenamento persistente pedido; mídia ausente com "Localizar arquivo" (selo dentro do cartão); atalhos configuráveis + painel; ajuda pt-BR no app; prévia leve 540p gerada sozinha para vídeos grandes (exportação sempre no original); acessibilidade (contraste AA medido, foco, clipes e abas por teclado, separadores anunciados).
+- Abrir do disco (file://), medido no Chromium: script módulo, import dinâmico, fetch local, worker módulo e OPFS são bloqueados. Solução: build clássico (iife, sem divisão), workers embutidos (Blob clássico), worklet por data:, armazenamento cai para IndexedDB, lista de fontes no bundle. Por file:// ficam desligados (com aviso): legendas automáticas, remover fundo, MP3 e o MP4 com AAC — o MP4 sai com som Opus e aviso. Por http tudo funciona. Bundle principal ~3,3 MB (893 KB gzip).
+- Desempenho (projeto 50 clipes / 5 trilhas, 3 vídeos de codecs diferentes + PiP + imagens + textos + música, prévia 960×540, prévia leve desligada): renderização média 3–4 ms, p95 < 5 ms → 30 fps folgado. Achado: o mesmo vídeo em dois clipes ao mesmo tempo disputava um decodificador (atrasos de até 2 s nos cortes). Correção: até 2 decodificadores por vídeo ("vaga" por clipe) + aquecer o próximo clipe 700 ms antes do corte → quadros com atraso > 100 ms caíram de 3,5–10% para ~1%.
+- Etapa 10 passou (revisor: PASSA após 4 ajustes; 1492 testes; dist conferido por file:// e http no Chromium headless).
+- Pendências pequenas conhecidas (não bloqueiam): ao localizar arquivo, miniaturas não são refeitas; cortar cauda do eco/reverb ao pausar; portão de ruído começa fechado; marcações de batida fora do desfazer; restaurar original de clipe invertido após dividir/aparar; limpar assets gerados órfãos; arquivos > 300 linhas (pt-BR.ts, alguns testes).

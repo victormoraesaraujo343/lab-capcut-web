@@ -215,3 +215,100 @@ describe('createPreviewFrameProvider', () => {
     expect(bitmapClose).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('createPreviewFrameProvider com cópia leve', () => {
+  const proxy = makeAsset('mp4-proxy', 'video', 'video/mp4');
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.supported.mockReturnValue(true);
+    mocks.demux.mockImplementation((asset: Asset) => asset.mimeType === 'video/mp4');
+    mocks.webcodecs.open.mockReset().mockResolvedValue(true);
+    mocks.webcodecs.getFrame.mockReset();
+  });
+
+  it('decodifica a cópia leve quando a prévia leve está ligada e a cópia existe', async () => {
+    const frame = { close: vi.fn() } as unknown as VideoFrame;
+    mocks.webcodecs.getFrame.mockResolvedValue(frame);
+    const provider = createPreviewFrameProvider({
+      proxiesEnabled: () => true,
+      findReadyProxy: (asset) => (asset.id === 'mp4' ? proxy : undefined),
+    });
+    expect(await provider.getFrame(mp4, 1000, { exact: true })).toBe(frame);
+    expect(mocks.webcodecs.getFrame).toHaveBeenCalledWith(proxy, 1000, true);
+  });
+
+  it('decodifica o original quando a prévia leve está desligada', async () => {
+    mocks.webcodecs.getFrame.mockResolvedValue({ close: vi.fn() } as unknown as VideoFrame);
+    const provider = createPreviewFrameProvider({
+      proxiesEnabled: () => false,
+      findReadyProxy: () => proxy,
+    });
+    await provider.getFrame(mp4, 1000, { exact: true });
+    expect(mocks.webcodecs.getFrame).toHaveBeenCalledWith(mp4, 1000, true);
+  });
+
+  it('decodifica o original quando ainda não há cópia pronta', async () => {
+    mocks.webcodecs.getFrame.mockResolvedValue({ close: vi.fn() } as unknown as VideoFrame);
+    const provider = createPreviewFrameProvider({
+      proxiesEnabled: () => true,
+      findReadyProxy: () => undefined,
+    });
+    await provider.getFrame(mp4, 250, { exact: true });
+    expect(mocks.webcodecs.getFrame).toHaveBeenCalledWith(mp4, 250, true);
+  });
+
+  it('fechar a origem também fecha a cópia leve dela', async () => {
+    mocks.webcodecs.getFrame.mockResolvedValue({ close: vi.fn() } as unknown as VideoFrame);
+    const provider = createPreviewFrameProvider({
+      proxiesEnabled: () => true,
+      findReadyProxy: (asset) => (asset.id === 'mp4' ? proxy : undefined),
+    });
+    await provider.getFrame(mp4, 0, { exact: true });
+    provider.closeAsset('mp4');
+    expect(mocks.webcodecs.close).toHaveBeenCalledWith('mp4');
+    expect(mocks.webcodecs.close).toHaveBeenCalledWith('mp4-proxy');
+  });
+});
+
+describe('createPreviewFrameProvider com lanes', () => {
+  /** Ids de asset passados ao getFrame do WebCodecs, na ordem das chamadas. */
+  function decoderIds(): string[] {
+    return mocks.webcodecs.getFrame.mock.calls.map((call) => (call[0] as Asset).id);
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.supported.mockReturnValue(true);
+    mocks.demux.mockImplementation((asset: Asset) => asset.mimeType === 'video/mp4');
+    mocks.webcodecs.open.mockReset().mockResolvedValue(true);
+    mocks.webcodecs.getFrame.mockReset().mockResolvedValue({ close: vi.fn() } as unknown as VideoFrame);
+  });
+
+  it('dois clipes do mesmo vídeo usam dois decodificadores', async () => {
+    const provider = createPreviewFrameProvider({ proxiesEnabled: () => false });
+    await provider.getFrame(mp4, 0, { exact: true, lane: 'clipA' });
+    await provider.getFrame(mp4, 0, { exact: true, lane: 'clipB' });
+    expect(decoderIds()).toEqual(['mp4', 'mp4#2']);
+  });
+
+  it('o terceiro clipe toma a vaga usada há mais tempo', async () => {
+    const provider = createPreviewFrameProvider({ proxiesEnabled: () => false });
+    await provider.getFrame(mp4, 0, { exact: true, lane: 'clipA' });
+    await provider.getFrame(mp4, 0, { exact: true, lane: 'clipB' });
+    await provider.getFrame(mp4, 10, { exact: true, lane: 'clipA' });
+    await provider.getFrame(mp4, 0, { exact: true, lane: 'clipC' });
+    expect(decoderIds().slice(3)).toEqual(['mp4#2']);
+    await provider.getFrame(mp4, 20, { exact: true, lane: 'clipA' });
+    expect(decoderIds().slice(4)).toEqual(['mp4']);
+  });
+
+  it('fechar o asset fecha as duas vagas', async () => {
+    const provider = createPreviewFrameProvider({ proxiesEnabled: () => false });
+    await provider.getFrame(mp4, 0, { exact: true, lane: 'clipA' });
+    await provider.getFrame(mp4, 0, { exact: true, lane: 'clipB' });
+    provider.closeAsset('mp4');
+    expect(mocks.webcodecs.close).toHaveBeenCalledWith('mp4');
+    expect(mocks.webcodecs.close).toHaveBeenCalledWith('mp4#2');
+  });
+});

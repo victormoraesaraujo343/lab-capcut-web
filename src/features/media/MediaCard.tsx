@@ -26,6 +26,10 @@ export interface MediaCardProps {
   onMove: (assetId: string, folderId: string | undefined) => void;
   /** Remove o asset da biblioteca. */
   onRemove: (assetId: string) => void;
+  /** O arquivo da mídia não foi encontrado no armazenamento. */
+  missing?: boolean;
+  /** Abre a escolha de arquivo para localizar a mídia ausente. */
+  onLocate?: (assetId: string) => void;
 }
 
 /** Indica se um DataTransfer carrega um asset arrastado de dentro do painel. */
@@ -34,7 +38,7 @@ export function isAssetDrag(dataTransfer: DataTransfer): boolean {
 }
 
 /** Card de mídia com miniatura 16:9, duração, tipo, nome e menu de ações; arrastável para a linha do tempo. */
-export function MediaCard({ asset, folders, onMove, onRemove }: MediaCardProps) {
+export function MediaCard({ asset, folders, onMove, onRemove, missing = false, onLocate }: MediaCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const thumbUrl = useObjectUrl(asset.thumbnails[0]);
   const durationLabel =
@@ -85,6 +89,7 @@ export function MediaCard({ asset, folders, onMove, onRemove }: MediaCardProps) 
             <Placeholder asset={asset} />
           )}
           {durationLabel !== undefined ? <span className={styles.duration}>{durationLabel}</span> : null}
+          {missing ? <span className={styles.missingBadge}>{t.missingMedia.badge}</span> : null}
         </div>
         <div className={styles.meta}>
           <KindIcon kind={asset.kind} />
@@ -93,6 +98,11 @@ export function MediaCard({ asset, folders, onMove, onRemove }: MediaCardProps) 
           </span>
         </div>
       </div>
+      {missing && onLocate !== undefined ? (
+        <button type="button" className={styles.locateButton} onClick={() => onLocate(asset.id)}>
+          {t.missingMedia.locate}
+        </button>
+      ) : null}
 
       <div className={styles.menuWrap} onBlur={handleMenuBlur} onKeyDown={handleMenuKeyDown}>
         <IconButton

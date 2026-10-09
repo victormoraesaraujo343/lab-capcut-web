@@ -1,4 +1,5 @@
 // Seção Velocidade do inspetor: aba Normal (velocidade constante em escala logarítmica) e aba Curva (editor e presets).
+import { handleTablistKeyDown } from '@/components/tabKeys';
 import { useState, type ChangeEvent, type KeyboardEvent } from 'react';
 import { t } from '@/i18n/pt-BR';
 import { MIN_CLIP_MS } from '@/engine/timeline/constants';
@@ -222,7 +223,7 @@ export function SpeedSection({ clip }: SpeedSectionProps) {
 
   return (
     <Section title={t.speed.title}>
-      <div className={sectionStyles.actions} role="tablist">
+      <div className={sectionStyles.actions} role="tablist" aria-label={t.speed.title}>
         {tabs.map((item) => (
           <button
             key={item.id}
@@ -230,6 +231,8 @@ export function SpeedSection({ clip }: SpeedSectionProps) {
             role="tab"
             className={sectionStyles.action}
             aria-selected={tab === item.id}
+            tabIndex={tab === item.id ? 0 : -1}
+            onKeyDown={handleTablistKeyDown}
             onClick={() => setTab(item.id)}
           >
             {item.label}

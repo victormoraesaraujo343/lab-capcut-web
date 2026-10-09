@@ -2,6 +2,7 @@
 import type { Asset } from '../../types/project';
 import type { DecodeRequest, DecodeResponse } from '../workers/decodeProtocol';
 import { fileExtension } from '../storage/paths';
+import DecodeWorker from '../workers/decode.worker?worker&inline';
 
 const DEMUX_MIME_TYPES = ['video/mp4', 'video/quicktime', 'video/x-m4v', 'video/webm'];
 const DEMUX_EXTENSIONS = ['mp4', 'mov', 'm4v', 'webm'];
@@ -110,7 +111,7 @@ export function createWebCodecsSource(): WebCodecsSource {
     if (worker) {
       return worker;
     }
-    const created = new Worker(new URL('../workers/decode.worker.ts', import.meta.url), { type: 'module' });
+    const created = new DecodeWorker();
     created.onmessage = (event: MessageEvent<DecodeResponse>) => {
       handleResponse(event.data);
     };

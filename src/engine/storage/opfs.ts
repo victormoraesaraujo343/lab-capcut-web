@@ -1,3 +1,11 @@
+import {
+  idbCopyDir,
+  idbDeleteEntry,
+  idbFileExists,
+  idbReadFile,
+  idbWriteFile,
+  isIdbAvailable,
+} from './idbFiles';
 import { splitPath } from './paths';
 
 /** Error raised by the OPFS layer, carrying a machine-readable code. */
@@ -28,6 +36,39 @@ interface AsyncEntriesCapable {
 
 const objectUrlCache = new Map<string, string>();
 
+/** Onde os arquivos ficam: OPFS (normal) ou IndexedDB (quando o OPFS lança erro, ex.: página aberta por file://). */
+export type StorageBackend = 'opfs' | 'idb';
+
+/** Detecção já feita, ligada à função getDirectory que ela testou (se o navegador trocar, detecta de novo). */
+let detection: { probe: unknown; result: Promise<StorageBackend> } | null = null;
+
+/** Diz qual armazenamento está em uso; testa o OPFS uma vez (cache) e cai para IndexedDB se ele não funcionar. */
+export function detectStorageBackend(): Promise<StorageBackend> {
+  const probe: unknown = typeof navigator !== 'undefined' ? navigator.storage?.getDirectory : undefined;
+  if (detection !== null && detection.probe === probe) return detection.result;
+  const result = probeBackend();
+  detection = { probe, result };
+  return result;
+}
+
+/** Esquece a detecção guardada; usado nos testes. */
+export function resetStorageBackend(): void {
+  detection = null;
+}
+
+/** Testa o OPFS de verdade (getDirectory pode lançar SecurityError por file://). */
+async function probeBackend(): Promise<StorageBackend> {
+  if (isOpfsAvailable()) {
+    try {
+      await navigator.storage.getDirectory();
+      return 'opfs';
+    } catch {
+      // OPFS bloqueado neste contexto: segue para o IndexedDB.
+    }
+  }
+  return isIdbAvailable() ? 'idb' : 'opfs';
+}
+
 /** Returns true when the Origin Private File System can be used in this context. */
 export function isOpfsAvailable(): boolean {
   const storage: StorageManager | undefined = typeof navigator !== 'undefined' ? navigator.storage : undefined;
@@ -42,6 +83,10 @@ export async function writeFile(path: string, data: WritableData): Promise<void>
     throw new Error('File path must not be empty');
   }
   await guard(async () => {
+    if ((await detectStorageBackend()) === 'idb') {
+      await idbWriteFile(path, data);
+      return;
+    }
     const parent = await resolveDirectory(segments, true);
     const handle = await parent.getFileHandle(name, { create: true });
     await writeToFileHandle(handle, data);
@@ -51,6 +96,11 @@ export async function writeFile(path: string, data: WritableData): Promise<void>
 /** Reads a file and returns it as a File object. */
 export async function readFile(path: string): Promise<File> {
   return guard(async () => {
+    if ((await detectStorageBackend()) === 'idb') {
+      const stored = await idbReadFile(path);
+      if (stored === undefined) throw new StorageError('notFound');
+      return stored;
+    }
     const { parent, name } = await resolveParent(path, false);
     const handle = await parent.getFileHandle(name);
     return handle.getFile();
@@ -59,6 +109,9 @@ export async function readFile(path: string): Promise<File> {
 
 /** Returns true when a file exists at the given path. */
 export async function fileExists(path: string): Promise<boolean> {
+  if ((await detectStorageBackend()) === 'idb') {
+    return guard(() => idbFileExists(path));
+  }
   try {
     const { parent, name } = await resolveParent(path, false);
     await parent.getFileHandle(name);
@@ -79,6 +132,10 @@ export async function deleteEntry(path: string): Promise<void> {
     throw new Error('Cannot delete the OPFS root');
   }
   try {
+    if ((await detectStorageBackend()) === 'idb') {
+      await idbDeleteEntry(path);
+      return;
+    }
     const parent = await resolveDirectory(segments, false);
     await parent.removeEntry(name, { recursive: true });
   } catch (error) {
@@ -92,6 +149,10 @@ export async function deleteEntry(path: string): Promise<void> {
 /** Copies a folder and all its contents recursively to another path. */
 export async function copyDir(fromPath: string, toPath: string): Promise<void> {
   await guard(async () => {
+    if ((await detectStorageBackend()) === 'idb') {
+      await idbCopyDir(fromPath, toPath);
+      return;
+    }
     const source = await resolveDirectory(splitPath(fromPath), false);
     const target = await resolveDirectory(splitPath(toPath), true);
     await copyDirectoryContents(source, target);

@@ -1,12 +1,12 @@
 // Retângulo de um clipe na trilha: cor por tipo, rótulo, miniaturas ou onda, seleção, arrasto, aparo e lâmina.
-import { memo, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { memo, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { Speech, TriangleAlert, Type } from 'lucide-react';
 import { t } from '@/i18n/pt-BR';
 import type { Clip, Track, TrackKind } from '@/types';
 import { MIN_CLIP_MS } from '@/engine/timeline/constants';
 import { msToPx, pxToMs, snapThresholdMs, snapValue } from '@/engine/timeline/snap';
 import { clipHasOwnSound } from '@/stores/audioCommands';
-import { selectClip, splitClipAtTime } from '@/stores/timelineCommands';
+import { moveSelected, selectClip, splitClipAtTime } from '@/stores/timelineCommands';
 import { useProjectStore } from '@/stores/projectStore';
 import { usePlaybackStore } from '@/stores/playbackStore';
 import { useTimelineStore } from '@/stores/timelineStore';
@@ -24,6 +24,8 @@ import styles from './ClipView.module.css';
 const WAVE_STRIP_PX = 12;
 /** Diferença entre a altura da linha e a do clipe (2px em cima e embaixo), em px. */
 const CLIP_INSET_PX = 4;
+/** Quadros por segundo assumidos quando não há projeto aberto. */
+const DEFAULT_FPS = 30;
 
 /** Classe de cor do clipe, por tipo de trilha. */
 const KIND_CLASS: Record<TrackKind, string | undefined> = {
@@ -153,6 +155,24 @@ export const ClipView = memo(function ClipView({
     setBladeX(msToPx(ms - clip.startMs, zoom));
   }
 
+  const fps = useProjectStore((s) => s.project?.fps) ?? DEFAULT_FPS;
+
+  /** Enter/Espaço seleciona; Alt+setas movem 1 quadro (Alt+Shift: 1 s) em um único passo do desfazer. */
+  function handleKeyDown(event: ReactKeyboardEvent<HTMLDivElement>): void {
+    if (locked || event.target !== event.currentTarget) return;
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      selectClip(clip.id, event.ctrlKey || event.metaKey || event.shiftKey);
+      return;
+    }
+    if (!event.altKey || (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (!selected) selectClip(clip.id, false);
+    const stepMs = event.shiftKey ? 1000 : 1000 / fps;
+    moveSelected(event.key === 'ArrowLeft' ? -stepMs : stepMs, 0, 'overwrite');
+  }
+
   const isText = clip.text !== undefined;
   const speech = clip.tts;
   const label = clip.text
@@ -179,6 +199,11 @@ export const ClipView = memo(function ClipView({
       style={{ left, width }}
       data-clip-id={clip.id}
       data-track-kind={track.kind}
+      role="group"
+      tabIndex={locked ? -1 : 0}
+      aria-label={selected ? `${label} (${t.timeline.clipSelected})` : label}
+      aria-keyshortcuts="Alt+ArrowLeft Alt+ArrowRight"
+      onKeyDown={handleKeyDown}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerLeave={() => setBladeX(null)}

@@ -1,6 +1,10 @@
-import { useRef, useState, type KeyboardEvent } from 'react';
-import { ArrowLeft, Download, Moon, Sun } from 'lucide-react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { ArrowLeft, CircleHelp, Download, Keyboard, Moon, Sun } from 'lucide-react';
 import { t } from '../../i18n/pt-BR';
+import { comboFromEvent, isInsideDialog, isTypingTarget } from '../shortcuts/keyCombo';
+import { useShortcutsStore } from '../shortcuts/shortcutsStore';
+import { HelpDialog } from '../help/HelpDialog';
+import { ShortcutsDialog } from '../shortcuts/ShortcutsDialog';
 import type { Theme } from '../../types/ui';
 import { IconButton } from '../../components/IconButton';
 import styles from './TopBar.module.css';
@@ -26,6 +30,20 @@ export function TopBar({ theme, onToggleTheme, projectName, onBack, onRename, on
   const activeRef = useRef(false);
   const displayName = projectName ?? t.app.title;
   const renamable = projectName !== undefined && onRename !== undefined;
+  const [dialog, setDialog] = useState<'help' | 'shortcuts' | null>(null);
+
+  // A tecla de ajuda e a de atalhos valem em qualquer tela, desde que o foco não esteja em campo de texto ou diálogo.
+  useEffect(() => {
+    const onKeyDown = (e: globalThis.KeyboardEvent): void => {
+      if (isTypingTarget(e.target) || isInsideDialog(e.target)) return;
+      const id = useShortcutsStore.getState().actionForCombo(comboFromEvent(e));
+      if (id !== 'help' && id !== 'shortcuts') return;
+      e.preventDefault();
+      setDialog(id);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   /** Abre o campo de renomear com o nome atual. */
   const startEditing = (): void => {
@@ -91,6 +109,14 @@ export function TopBar({ theme, onToggleTheme, projectName, onBack, onRename, on
       </div>
 
       <div className={styles.right}>
+        <button type="button" className={styles.ghostButton} onClick={() => setDialog('shortcuts')}>
+          <Keyboard size={16} strokeWidth={1.75} aria-hidden="true" />
+          <span>{t.shortcuts.open}</span>
+        </button>
+        <button type="button" className={styles.ghostButton} onClick={() => setDialog('help')}>
+          <CircleHelp size={16} strokeWidth={1.75} aria-hidden="true" />
+          <span>{t.help.open}</span>
+        </button>
         <IconButton icon={ThemeIcon} label={t.app.toggleTheme} onClick={onToggleTheme} />
         {projectName !== undefined ? (
           <button type="button" className={styles.exportButton} disabled={onExport === undefined} onClick={onExport}>
@@ -99,6 +125,8 @@ export function TopBar({ theme, onToggleTheme, projectName, onBack, onRename, on
           </button>
         ) : null}
       </div>
+      {dialog === 'help' ? <HelpDialog onClose={() => setDialog(null)} /> : null}
+      {dialog === 'shortcuts' ? <ShortcutsDialog onClose={() => setDialog(null)} /> : null}
     </header>
   );
 }

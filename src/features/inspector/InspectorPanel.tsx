@@ -1,6 +1,7 @@
 // Painel de Propriedades: mostra as seções do clipe selecionado (texto, ou abas de mídia: básico, filtros, efeitos, velocidade e ferramentas).
 import { useState, type ReactNode } from 'react';
 import { SlidersHorizontal } from 'lucide-react';
+import { handleTablistKeyDown } from '@/components/tabKeys';
 import { PanelShell } from '@/features/layout/PanelShell';
 import { t } from '@/i18n/pt-BR';
 import { findClip } from '@/engine/timeline/clipOps';
@@ -71,7 +72,7 @@ function TextClipBody({
 }) {
   return (
     <>
-      <div className={styles.tabs} role="tablist">
+      <div className={styles.tabs} role="tablist" aria-label={t.inspector.tabsLabel}>
         {TEXT_TABS.map((item) => (
           <button
             key={item.id}
@@ -79,6 +80,8 @@ function TextClipBody({
             role="tab"
             className={styles.tab}
             aria-selected={tab === item.id}
+            tabIndex={tab === item.id ? 0 : -1}
+            onKeyDown={handleTablistKeyDown}
             onClick={() => onTab(item.id)}
           >
             {item.label}
@@ -130,6 +133,7 @@ function MediaClipBody({ project, clip, visual, hasSound, asset, tab, onTab }: M
       <div
         className={styles.tabs}
         role="tablist"
+        aria-label={t.inspector.tabsLabel}
         style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}
       >
         {tabs.map((item) => (
@@ -139,6 +143,8 @@ function MediaClipBody({ project, clip, visual, hasSound, asset, tab, onTab }: M
             role="tab"
             className={styles.tab}
             aria-selected={current === item.id}
+            tabIndex={current === item.id ? 0 : -1}
+            onKeyDown={handleTablistKeyDown}
             onClick={() => onTab(item.id)}
           >
             {item.label}

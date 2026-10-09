@@ -5,6 +5,7 @@ import { t } from '@/i18n/pt-BR';
 import { useProjectStore } from '@/stores';
 import type { AspectRatio } from '@/types';
 import { PreviewControls } from './PreviewControls';
+import { ProxyToggle } from './ProxyToggle';
 import { fitStage } from './stageFit';
 import { startPlaybackController } from './playbackController';
 import { disposePreviewEngine } from './previewEngine';
@@ -84,7 +85,15 @@ export function PreviewPanel({ children }: { children?: ReactNode }) {
   const frame = fitStage(stageSize.width, stageSize.height, projectWidth, projectHeight);
 
   return (
-    <PanelShell title={t.panels.preview} actions={<AspectSelect />}>
+    <PanelShell
+      title={t.panels.preview}
+      actions={
+        <>
+          <ProxyToggle />
+          <AspectSelect />
+        </>
+      }
+    >
       <div className={styles.root}>
         <div ref={stageRef} className={styles.stage}>
           {error === 'webgl' ? (

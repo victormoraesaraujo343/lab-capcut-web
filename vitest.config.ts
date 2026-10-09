@@ -1,10 +1,11 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
+import { workletDataUrl } from './scripts/workletDataUrl.ts';
 
 const srcDir = decodeURIComponent(new URL('./src', import.meta.url).pathname);
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [workletDataUrl(), react()],
   resolve: {
     alias: {
       '@': srcDir,

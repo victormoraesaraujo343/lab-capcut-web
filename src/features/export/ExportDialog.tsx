@@ -3,6 +3,8 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, type Keyboard
 import { X } from 'lucide-react';
 import { useObjectUrl } from '../media/useObjectUrl';
 import { IconButton } from '../../components/IconButton';
+import { canEncodeAac } from '../../engine/export/aacSupport';
+import { canFetchLocalAssets } from '../../engine/env/runtimeEnv';
 import { t } from '../../i18n/pt-BR';
 import { DEFAULT_EXPORT_SETTINGS, GIF_MAX_MS, estimateSizeBytes, resolveExport } from '../../engine/export/exportSettings';
 import type { ExportFormat, ExportSettings, BitratePreset, ResolutionPreset } from '../../types/export';
@@ -54,11 +56,16 @@ function readSettings(value: unknown): ExportSettings {
   };
 }
 
+/** Troca o MP3 por WAV quando o app foi aberto do arquivo e o conversor não pode ser carregado. */
+function withoutBlockedFormat(settings: ExportSettings): ExportSettings {
+  return settings.format === 'mp3' && !canFetchLocalAssets() ? { ...settings, format: 'wav' } : settings;
+}
+
 /** Lê as escolhas salvas no navegador; sem acesso ao armazenamento usa o padrão. */
 function loadSettings(): ExportSettings {
   try {
     const raw = window.localStorage.getItem(SETTINGS_KEY);
-    return raw === null ? DEFAULT_EXPORT_SETTINGS : readSettings(JSON.parse(raw) as unknown);
+    return withoutBlockedFormat(raw === null ? DEFAULT_EXPORT_SETTINGS : readSettings(JSON.parse(raw) as unknown));
   } catch {
     return DEFAULT_EXPORT_SETTINGS;
   }
@@ -118,6 +125,17 @@ export function ExportDialog({ project, onClose }: ExportDialogProps) {
   const showFallback =
     (settings.format === 'mp4' || settings.format === 'webm') && typeof VideoEncoder === 'undefined';
   const running = status === 'running';
+  const [aacMissing, setAacMissing] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    void canEncodeAac().then((ok) => {
+      if (alive) setAacMissing(!ok);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const showOpusNotice = settings.format === 'mp4' && aacMissing && !canFetchLocalAssets();
 
   // Foco vai para o diálogo ao abrir e volta para quem abriu ao fechar; cancela a exportação se o diálogo sair da tela.
   useEffect(() => {
@@ -257,6 +275,7 @@ export function ExportDialog({ project, onClose }: ExportDialogProps) {
                 showGifLimit={showGifLimit}
                 showFallback={showFallback}
                 showLargeFileWarning={showLargeFile}
+                showOpusNotice={showOpusNotice}
                 onChange={handleChange}
               />
             ) : (

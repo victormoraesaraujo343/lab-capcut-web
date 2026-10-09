@@ -10,9 +10,16 @@ import { RecordingOverlay } from '@/features/recording/RecordingOverlay';
 import { PreviewPanel } from '@/features/preview/PreviewPanel';
 import { TransformOverlay } from '@/features/preview/TransformOverlay';
 import { disposeTranscriber } from '@/engine/captions/transcribeClient';
+import { SIDE_PANEL_LIMITS, TIMELINE_LIMITS } from '@/stores/uiStore';
+import { startAutosave, stopAutosave } from '@/stores/autosave';
 import { ResizeHandle } from '../../components/ResizeHandle';
 import { HANDLE_SIZE, TOP_BAR_HEIGHT, computeEditorLayout } from './editorLayout';
+import { RecoveryBanner } from './RecoveryBanner';
+import { SaveStatus } from './SaveStatus';
 import styles from './EditorScreen.module.css';
+
+/** Wrapper da barra superior: posição relativa para o indicador de salvamento ficar sobre ela. */
+const TOP_WRAPPER_STYLE = { position: 'relative', height: '100%', minWidth: 0 } as const;
 
 type ResizableKey = 'mediaWidth' | 'inspectorWidth' | 'timelineHeight';
 
@@ -67,6 +74,16 @@ export function EditorScreen() {
   // Ao sair do editor, encerra o worker de transcrição (libera a memória do modelo).
   useEffect(() => () => disposeTranscriber(), []);
 
+  // Enquanto o projeto estiver aberto, o salvamento automático acompanha as mudanças; ao sair, encerra.
+  const openProjectId = project?.id;
+  useEffect(() => {
+    if (openProjectId === undefined) return;
+    startAutosave(openProjectId);
+    return () => {
+      void stopAutosave();
+    };
+  }, [openProjectId]);
+
   const layout = computeEditorLayout(viewport.w, viewport.h, {
     mediaWidth,
     inspectorWidth,
@@ -109,14 +126,17 @@ export function EditorScreen() {
         }}
       >
         <Cell className={styles.top}>
-          <TopBar
-            theme={theme}
-            onToggleTheme={toggleTheme}
-            projectName={project.name}
-            onBack={() => void runWithToast(closeProject(), t.errors.projectSave)}
-            onRename={handleRename}
-            onExport={openExport}
-          />
+          <div style={TOP_WRAPPER_STYLE}>
+            <TopBar
+              theme={theme}
+              onToggleTheme={toggleTheme}
+              projectName={project.name}
+              onBack={() => void runWithToast(closeProject(), t.errors.projectSave)}
+              onRename={handleRename}
+              onExport={openExport}
+            />
+            <SaveStatus />
+          </div>
         </Cell>
 
         {layout.showMedia && (
@@ -129,6 +149,9 @@ export function EditorScreen() {
               <ResizeHandle
                 orientation="vertical"
                 label={t.resize.media}
+                value={layout.mediaWidth}
+                min={SIDE_PANEL_LIMITS.min}
+                max={SIDE_PANEL_LIMITS.max}
                 onResize={(delta) => adjustPanel('mediaWidth', delta)}
               />
             </Cell>
@@ -147,6 +170,9 @@ export function EditorScreen() {
               <ResizeHandle
                 orientation="vertical"
                 label={t.resize.inspector}
+                value={layout.inspectorWidth}
+                min={SIDE_PANEL_LIMITS.min}
+                max={SIDE_PANEL_LIMITS.max}
                 onResize={(delta) => adjustPanel('inspectorWidth', -delta)}
               />
             </Cell>
@@ -161,6 +187,9 @@ export function EditorScreen() {
           <ResizeHandle
             orientation="horizontal"
             label={t.resize.timeline}
+            value={layout.timelineHeight}
+            min={TIMELINE_LIMITS.min}
+            max={TIMELINE_LIMITS.max}
             onResize={(delta) => adjustPanel('timelineHeight', -delta)}
           />
         </Cell>
@@ -170,6 +199,7 @@ export function EditorScreen() {
         </Cell>
       </div>
       <RecordingOverlay />
+      <RecoveryBanner />
       {exportOpen && <ExportDialog project={project} onClose={() => setExportOpen(false)} />}
     </>
   );

@@ -7,8 +7,19 @@ import { copyDir, deleteEntry } from '@/engine/storage/opfs';
 import { projectDir } from '@/engine/storage/paths';
 
 const DB_NAME = 'capcut-web';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE = 'projects';
+const RECOVERY_STORE = 'recovery';
+
+/** Instantâneo de recuperação de um projeto, gravado pelo salvamento automático. */
+export interface RecoverySnapshot {
+  /** Identificador do projeto ao qual o instantâneo pertence. */
+  projectId: string;
+  /** Momento em que o instantâneo foi gravado, em timestamp (ms). */
+  savedAt: number;
+  /** Cópia completa do projeto no momento do instantâneo. */
+  project: Project;
+}
 
 /** Esquema tipado do banco 'capcut-web'. */
 interface CapcutDB extends DBSchema {
@@ -16,6 +27,10 @@ interface CapcutDB extends DBSchema {
     key: string;
     value: Project;
     indexes: { updatedAt: number };
+  };
+  recovery: {
+    key: string;
+    value: RecoverySnapshot;
   };
 }
 
@@ -43,9 +58,15 @@ let dbPromise: Promise<IDBPDatabase<CapcutDB>> | undefined;
 function getDb(): Promise<IDBPDatabase<CapcutDB>> {
   if (!dbPromise) {
     dbPromise = openDB<CapcutDB>(DB_NAME, DB_VERSION, {
-      upgrade(db) {
-        const store = db.createObjectStore(STORE, { keyPath: 'id' });
-        store.createIndex('updatedAt', 'updatedAt');
+      upgrade(db, oldVersion) {
+        // Cada bloco cria só o que falta para a versão anterior, sem tocar nos projetos já salvos.
+        if (oldVersion < 1) {
+          const store = db.createObjectStore(STORE, { keyPath: 'id' });
+          store.createIndex('updatedAt', 'updatedAt');
+        }
+        if (oldVersion < 2) {
+          db.createObjectStore(RECOVERY_STORE, { keyPath: 'projectId' });
+        }
       },
     }).catch((error: unknown) => {
       dbPromise = undefined;
@@ -88,6 +109,24 @@ export async function getProject(id: string): Promise<Project | undefined> {
 export async function saveProject(p: Project): Promise<void> {
   const db = await getDb();
   await db.put(STORE, p);
+}
+
+/** Grava (ou substitui) o instantâneo de recuperação de um projeto. */
+export async function putRecoverySnapshot(snapshot: RecoverySnapshot): Promise<void> {
+  const db = await getDb();
+  await db.put(RECOVERY_STORE, snapshot);
+}
+
+/** Lê o instantâneo de recuperação de um projeto, ou undefined se não houver. */
+export async function getRecoverySnapshot(projectId: string): Promise<RecoverySnapshot | undefined> {
+  const db = await getDb();
+  return db.get(RECOVERY_STORE, projectId);
+}
+
+/** Apaga o instantâneo de recuperação de um projeto; não faz nada se não existir. */
+export async function deleteRecoverySnapshot(projectId: string): Promise<void> {
+  const db = await getDb();
+  await db.delete(RECOVERY_STORE, projectId);
 }
 
 /** Remove o projeto do banco e apaga a pasta dele no OPFS. */

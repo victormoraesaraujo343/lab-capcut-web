@@ -8,13 +8,19 @@ export interface ResizeHandleProps {
   onResize: (deltaPx: number) => void;
   /** Nome acessível do separador. */
   label: string;
+  /** Tamanho atual do painel, em pixels (anunciado como aria-valuenow). */
+  value?: number;
+  /** Tamanho mínimo do painel, em pixels. */
+  min?: number;
+  /** Tamanho máximo do painel, em pixels. */
+  max?: number;
 }
 
 const STEP_PX = 10;
 const STEP_PX_LARGE = 50;
 
 /** Separador arrastável entre painéis, com suporte a teclado. */
-export function ResizeHandle({ orientation, onResize, label }: ResizeHandleProps) {
+export function ResizeHandle({ orientation, onResize, label, value, min, max }: ResizeHandleProps) {
   const isVertical = orientation === 'vertical';
   const lastPosRef = useRef<number | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -68,6 +74,9 @@ export function ResizeHandle({ orientation, onResize, label }: ResizeHandleProps
       role="separator"
       aria-orientation={orientation}
       aria-label={label}
+      aria-valuenow={value}
+      aria-valuemin={min}
+      aria-valuemax={max}
       tabIndex={0}
       className={className}
       onPointerDown={handlePointerDown}

@@ -37,7 +37,7 @@ function createMp4(config: ResolvedExport, hasAudio: boolean, sampleRate: number
   const muxer = new Mp4Muxer({
     target,
     video: { codec: 'avc', width: config.width, height: config.height, frameRate: config.fps },
-    audio: hasAudio ? { codec: 'aac', numberOfChannels: 2, sampleRate } : undefined,
+    audio: hasAudio ? { codec: config.audioCodec === 'opus' ? 'opus' : 'aac', numberOfChannels: 2, sampleRate } : undefined,
     fastStart: 'in-memory',
     firstTimestampBehavior: 'offset',
   });

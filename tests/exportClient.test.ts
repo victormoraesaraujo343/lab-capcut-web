@@ -151,6 +151,23 @@ describe('startExport', () => {
     expect(fileName).toBe('saida.mp4');
   });
 
+  it('aberto por file:// sem AAC exporta o MP4 com áudio Opus no worker, sem ffmpeg', async () => {
+    vi.stubGlobal('VideoEncoder', class {});
+    vi.stubGlobal('Worker', FakeWorker);
+    vi.stubGlobal('location', { protocol: 'file:' });
+    canEncodeAacMock.mockResolvedValue(false);
+    mixMock.mockResolvedValue(testMix());
+    const handle = startExport(projectWith(true), settingsFor('mp4'), () => undefined);
+    await vi.waitFor(() => expect(FakeWorker.instances).toHaveLength(1));
+    const worker = FakeWorker.instances[0];
+    const [message] = worker?.postMessage.mock.calls[0] ?? [];
+    expect(message).toMatchObject({ type: 'start', config: { format: 'mp4', audioCodec: 'opus' } });
+    expect(message.audio).not.toBeNull();
+    worker?.emit({ type: 'done', jobId: 1, data: new ArrayBuffer(4), mimeType: 'video/mp4', fileName: 'saida.mp4' });
+    await handle.result;
+    expect(muxMock).not.toHaveBeenCalled();
+  });
+
   it('com AAC no navegador manda o áudio ao worker e não chama o ffmpeg de áudio', async () => {
     vi.stubGlobal('VideoEncoder', class {});
     vi.stubGlobal('Worker', FakeWorker);

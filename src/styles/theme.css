@@ -11,6 +11,8 @@
   --bg-elevated: #26262d;
   --bg-hover: #2c2c35;
   --border: #2a2a31;
+  /* Borda de controles interativos (campos, botões): ≥ 3:1 contra o fundo (WCAG 1.4.11). */
+  --border-control: #7c7c8c;
 
   /* Texto */
   --text: #e8e8ec;
@@ -46,19 +48,20 @@
   --bg-elevated: #ffffff;
   --bg-hover: #e4e4ea;
   --border: #d4d4dc;
+  --border-control: #7b7b88;
 
   --text: #18181c;
   --text-muted: #55555f;
   --text-faint: #62626d;
 
-  --accent: #0e7490;
+  --accent: #0c6b85;
   --accent-hover: #155e75;
   --accent-contrast: #ffffff;
 
   --danger: #b91c1c;
-  --focus-ring: #0e7490;
+  --focus-ring: #0c6b85;
 
-  --clip-video: #0e7490;
+  --clip-video: #0c6b85;
   --clip-audio: #15803d;
   --clip-text: #b45309;
   --clip-sticker: #be185d;

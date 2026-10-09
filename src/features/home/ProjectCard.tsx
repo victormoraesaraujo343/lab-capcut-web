@@ -3,8 +3,17 @@ import { Clapperboard, Ellipsis } from 'lucide-react';
 import { t } from '../../i18n/pt-BR';
 import type { ProjectSummary } from '../../engine/storage/db';
 import { getObjectUrl } from '../../engine/storage/opfs';
+import { exportProjectArchive } from '../../engine/archive/projectArchive';
+import { useToastStore } from '../../stores';
+import { downloadBlob } from '../export/downloadBlob';
 import { formatDuration, formatRelativeDate } from '../../utils/time';
 import styles from './ProjectCard.module.css';
+
+/** Nome de arquivo seguro para o .zip do projeto; sem nome, usa o id. */
+function archiveFileName(name: string, id: string): string {
+  const cleaned = name.replace(/[\\/:*?"<>|]+/g, ' ').trim();
+  return cleaned === '' ? id : cleaned;
+}
 
 export interface ProjectCardProps {
   /** Resumo do projeto exibido no cartão. */
@@ -25,6 +34,8 @@ export function ProjectCard({ project, onOpen, onRename, onDuplicate, onDelete }
   const [menuOpen, setMenuOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [draft, setDraft] = useState('');
+  const [exportPercent, setExportPercent] = useState<number | null>(null);
+  const pushToast = useToastStore((s) => s.pushToast);
   const menuRef = useRef<HTMLDivElement>(null);
   const activeRef = useRef(false);
   const coverPath = project.coverPath;
@@ -121,6 +132,24 @@ export function ProjectCard({ project, onOpen, onRename, onDuplicate, onDelete }
     }
   };
 
+  /** Gera o .zip do projeto, mostra o andamento no cartão e baixa o arquivo. */
+  const handleExport = async (): Promise<void> => {
+    setMenuOpen(false);
+    setExportPercent(0);
+    try {
+      const blob = await exportProjectArchive(
+        project.id,
+        (fraction) => setExportPercent(Math.round(fraction * 100)),
+        () => pushToast(t.archive.missing, 'info'),
+      );
+      downloadBlob(blob, `${archiveFileName(project.name, project.id)}.zip`);
+    } catch {
+      pushToast(t.archive.exportFailed, 'error');
+    } finally {
+      setExportPercent(null);
+    }
+  };
+
   /** Pede confirmação e exclui o projeto. */
   const handleDelete = (): void => {
     setMenuOpen(false);
@@ -166,6 +195,9 @@ export function ProjectCard({ project, onOpen, onRename, onDuplicate, onDelete }
             </h3>
           )}
           <p className={styles.meta}>{meta.join(' · ')}</p>
+          {exportPercent !== null ? (
+            <p className={styles.meta}>{`${t.archive.exporting} ${exportPercent}%`}</p>
+          ) : null}
         </div>
 
         <div className={styles.menuWrap} ref={menuRef}>
@@ -194,6 +226,15 @@ export function ProjectCard({ project, onOpen, onRename, onDuplicate, onDelete }
                 onClick={() => { setMenuOpen(false); onDuplicate(project.id); }}
               >
                 {t.home.duplicate}
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className={styles.menuItem}
+                disabled={exportPercent !== null}
+                onClick={() => void handleExport()}
+              >
+                {t.archive.export}
               </button>
               <button type="button" role="menuitem" className={`${styles.menuItem} ${styles.menuItemDanger}`} onClick={handleDelete}>
                 {t.home.delete}

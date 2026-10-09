@@ -5,3 +5,4 @@ public/ffmpeg
 tests/output
 tests/fixtures/media/video-1min.mp4
 public/ort
+.filetest

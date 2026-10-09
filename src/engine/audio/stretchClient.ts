@@ -1,5 +1,6 @@
 // Cliente do worker de esticamento: um único worker, criado na primeira necessidade, com pedidos por requestId.
 import type { StretchRequest, StretchResponse } from '../workers/stretch.worker';
+import StretchWorker from '../workers/stretch.worker?worker&inline';
 
 interface PendingStretch {
   resolve: (channels: Float32Array<ArrayBuffer>[]) => void;
@@ -15,7 +16,7 @@ function getWorker(): Worker {
   if (worker !== null) {
     return worker;
   }
-  const created = new Worker(new URL('../workers/stretch.worker.ts', import.meta.url), { type: 'module' });
+  const created = new StretchWorker();
   created.onmessage = (event: MessageEvent<StretchResponse>) => {
     const response = event.data;
     const entry = pending.get(response.requestId);

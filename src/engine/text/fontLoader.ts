@@ -1,5 +1,7 @@
 // Carregamento de fontes: embutidas (public/fonts, pelo manifesto) ou Google Fonts sob demanda. Memoizado; falha vira false.
 import type { Project } from '../../types/project';
+import { canFetchLocalAssets } from '../env/runtimeEnv';
+import bundledManifest from '../../../public/fonts/fonts.json';
 import { loadGoogleFont, registerFontFace } from './googleFonts';
 
 /** Entrada do manifesto public/fonts/fonts.json. */
@@ -42,10 +44,12 @@ export function fontEpoch(): number {
   return epoch;
 }
 
-/** Lê o manifesto public/fonts/fonts.json a partir da URL base do app; a resposta fica guardada. */
+/** Lê o manifesto public/fonts/fonts.json a partir da URL base do app; a resposta fica guardada.
+ * Aberto por file:// o navegador bloqueia o fetch, então usa a cópia do manifesto embutida no código. */
 export function loadBundledFontManifest(baseUrl: string): Promise<BundledFont[]> {
   const cached = manifests.get(baseUrl);
   if (cached !== undefined) return cached;
+  if (!canFetchLocalAssets()) return Promise.resolve(bundledManifest as BundledFont[]);
   const url = new URL('fonts/fonts.json', baseUrl).href;
   const promise = fetch(url).then(async (response) => {
     if (!response.ok) throw new Error('font-manifest-failed');

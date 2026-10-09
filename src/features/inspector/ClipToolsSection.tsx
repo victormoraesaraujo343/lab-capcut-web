@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import { IconButton } from '@/components/IconButton';
+import { canFetchLocalAssets } from '@/engine/env/runtimeEnv';
 import { t } from '@/i18n/pt-BR';
 import { runReverseJob } from '@/engine/jobs/reverseJob';
 import { freezeFrame } from '@/stores/clipToolCommands';
@@ -73,14 +74,18 @@ export function ClipToolsSection({ clip }: ClipToolsSectionProps) {
         >
           {t.inspector.toolReverse}
         </button>
-        <button
-          type="button"
-          className={sectionStyles.action}
-          disabled={running('removeBackground')}
-          onClick={() => void removeBackground(clip.id)}
-        >
-          {t.inspector.toolRemoveBackground}
-        </button>
+        {canFetchLocalAssets() ? (
+          <button
+            type="button"
+            className={sectionStyles.action}
+            disabled={running('removeBackground')}
+            onClick={() => void removeBackground(clip.id)}
+          >
+            {t.inspector.toolRemoveBackground}
+          </button>
+        ) : (
+          <p role="note">{t.env.needsWebAddress}</p>
+        )}
       </div>
       <NumberField
         label={t.inspector.toolStrength}

@@ -55,9 +55,11 @@ describe('HomeScreen', () => {
     expect(screen.getByText(t.home.loading)).toBeInTheDocument();
   });
 
-  it('clique em "Novo projeto" chama createNewProject', () => {
+  it('"Novo projeto" abre a escolha de modelo e "Projeto em branco" chama createNewProject', () => {
     render(createElement(HomeScreen));
     fireEvent.click(screen.getByRole('button', { name: t.home.newProject }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(t.templates.blank) }));
     expect(createNewProject).toHaveBeenCalledTimes(1);
   });
 

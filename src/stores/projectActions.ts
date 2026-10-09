@@ -5,6 +5,12 @@ import { createId } from '@/engine/project/createProject';
 import { deleteEntry, revokeObjectUrl } from '@/engine/storage/opfs';
 import { thumbDir } from '@/engine/storage/paths';
 import { computeProjectDuration, type Asset, type Folder, type Project } from '@/types';
+import { saveProject } from '@/engine/storage/db';
+import { findTemplate } from '@/engine/templates/templates';
+import { projectFromTemplate } from '@/engine/templates/buildTemplate';
+import { t } from '@/i18n/pt-BR';
+import { useProjectStore } from './projectStore';
+import { flushSave } from './projectPersistence';
 
 /** Andamento da importação em curso. */
 export interface ImportProgress {
@@ -121,4 +127,16 @@ export async function importSequentially(
     done += 1;
   }
   hooks.onProgress(null);
+}
+
+/** Cria e salva um projeto a partir do modelo (nome = nome do modelo), abre-o no editor e devolve o id. */
+export async function createProjectFromTemplate(templateId: string): Promise<string> {
+  const def = findTemplate(templateId);
+  if (def === undefined) throw new Error(`Modelo não encontrado: ${templateId}`);
+  await flushSave();
+  const project = projectFromTemplate(def, t.templates.names[def.labelKey]);
+  await saveProject(project);
+  useProjectStore.setState({ project });
+  await useProjectStore.getState().loadProjects();
+  return project.id;
 }

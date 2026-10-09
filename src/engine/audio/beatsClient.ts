@@ -1,6 +1,7 @@
 // Cliente da detecção de batidas: decodifica o áudio do asset na thread principal e roda a análise num worker.
 import { createAudioBufferCache } from './audioBufferCache';
 import type { Asset } from '../../types/project';
+import BeatsWorker from '../workers/beats.worker?worker&inline';
 
 /** Taxa de amostragem usada para decodificar o áudio do asset, em Hz. */
 const DECODE_SAMPLE_RATE = 44100;
@@ -101,7 +102,7 @@ function runDetection(mono: Float32Array, sampleRate: number, sensitivity: numbe
 /** Devolve o worker, criando-o na primeira chamada. */
 function getWorker(): Worker {
   if (worker !== null) return worker;
-  const created = new Worker(new URL('../workers/beats.worker.ts', import.meta.url), { type: 'module' });
+  const created = new BeatsWorker();
   created.onmessage = (event: MessageEvent<BeatsResponse>) => handleResponse(event.data);
   created.onerror = () => failAll(new Error('Falha no worker de batidas.'));
   worker = created;

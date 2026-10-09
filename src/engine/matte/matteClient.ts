@@ -1,6 +1,7 @@
 // Cliente da máscara: mantém um único worker e gera o MP4 em tons de cinza do trecho de um asset.
 import type { Asset } from '../../types/project';
 import type { MattePhase, MatteRequest, MatteResponse } from './matteProtocol';
+import MatteWorker from '../workers/matte.worker?worker&inline';
 
 /** Progresso de uma geração: fase e fração 0 a 1 dentro dela. */
 export interface MatteProgress {
@@ -90,7 +91,7 @@ function abortError(): DOMException {
 /** Devolve o worker, criando-o na primeira chamada. */
 function getWorker(): Worker {
   if (worker !== null) return worker;
-  const created = new Worker(new URL('../workers/matte.worker.ts', import.meta.url), { type: 'module' });
+  const created = new MatteWorker();
   created.onmessage = (event: MessageEvent<MatteResponse>) => handleResponse(event.data);
   created.onerror = () => rejectAll(new MatteError('process', 'Falha no worker de máscara.'));
   worker = created;

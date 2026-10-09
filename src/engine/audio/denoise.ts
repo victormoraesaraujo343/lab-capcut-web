@@ -5,7 +5,7 @@
 
 import type { AudioStage } from './voiceEffects';
 import { DEFAULT_GATE_PARAMS } from './noiseGate';
-import noiseGateWorkletUrl from './worklets/noiseGateProcessor?worker&url';
+import noiseGateWorkletUrl from './worklets/noiseGateProcessor?worklet-data';
 
 /** Nome do processador do portão, igual ao registrado em worklets/noiseGateProcessor.ts. */
 const NOISE_GATE_NAME = 'noise-gate';

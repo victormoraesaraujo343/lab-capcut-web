@@ -1,5 +1,6 @@
 // Cliente de exportação na thread principal: mixa o áudio, escolhe o caminho de codificação e informa progresso.
 import { mixProjectAudio } from '../../engine/audio/offlineMix';
+import { canFetchLocalAssets } from '../../engine/env/runtimeEnv';
 import { canEncodeAac } from '../../engine/export/aacSupport';
 import { muxAacWithFfmpeg } from '../../engine/export/ffmpegAacMux';
 import { estimateSizeBytes, resolveExport } from '../../engine/export/exportSettings';
@@ -16,6 +17,7 @@ import type {
 } from '../../types/export';
 import type { Project } from '../../types/project';
 import { createEtaEstimator } from './eta';
+import ExportWorker from '../../engine/workers/export.worker?worker&inline';
 
 /** Resultado de uma exportação concluída: o arquivo e o nome sugerido para salvar. */
 export interface ExportResult {
@@ -133,7 +135,7 @@ async function encodeInWorker(
 ): Promise<Blob> {
   if (signal.aborted) throw abortError();
   return new Promise<Blob>((resolve, reject) => {
-    const worker = new Worker(new URL('../../engine/workers/export.worker.ts', import.meta.url), { type: 'module' });
+    const worker = new ExportWorker();
     session.worker = worker;
     worker.onmessage = (event: MessageEvent<ExportResponse>) => {
       const message = event.data;
@@ -279,7 +281,13 @@ async function runExport(
     if (resolved.format === 'mp4' && mix !== null) {
       const aac = await canEncodeAac();
       if (signal.aborted) throw abortError();
-      if (!aac) return finish(await encodeMp4WithFfmpegAudio(project, resolved, mix, emit, signal, session));
+      if (!aac && canFetchLocalAssets()) {
+        return finish(await encodeMp4WithFfmpegAudio(project, resolved, mix, emit, signal, session));
+      }
+      // Aberto do arquivo não há ffmpeg: o MP4 leva o áudio em Opus, que o mp4-muxer sabe escrever.
+      if (!aac) {
+        return finish(await encodeVideoWithFallback(project, { ...resolved, audioCodec: 'opus' }, mix, emit, signal, session));
+      }
     }
     return finish(await encodeVideoWithFallback(project, resolved, mix, emit, signal, session));
   }

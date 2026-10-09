@@ -3,9 +3,9 @@ import { create } from 'zustand';
 import type { PanelSizes, Theme } from '@/types';
 
 /** Limites de largura dos painéis laterais, em pixels. */
-const SIDE_PANEL_LIMITS = { min: 200, max: 600 } as const;
+export const SIDE_PANEL_LIMITS = { min: 200, max: 600 } as const;
 /** Limites de altura da timeline, em pixels. */
-const TIMELINE_LIMITS = { min: 150, max: 600 } as const;
+export const TIMELINE_LIMITS = { min: 150, max: 600 } as const;
 
 /** Estado e ações da interface. */
 export interface UiState {

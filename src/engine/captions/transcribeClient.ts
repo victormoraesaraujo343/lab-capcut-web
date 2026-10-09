@@ -7,6 +7,7 @@ import type {
   TranscribeResponse,
   WhisperModelSize,
 } from './transcribeProtocol';
+import TranscribeWorker from '../workers/transcribe.worker?worker&inline';
 
 /** Opções de uma transcrição. */
 export interface TranscribeOptions {
@@ -100,7 +101,7 @@ function getWorker(): Worker {
   if (worker !== null) {
     return worker;
   }
-  const created = new Worker(new URL('../workers/transcribe.worker.ts', import.meta.url), { type: 'module' });
+  const created = new TranscribeWorker();
   created.onmessage = (event: MessageEvent<TranscribeResponse>) => handleResponse(event.data);
   created.onerror = () => failAll(new Error('Falha no worker de transcrição.'));
   worker = created;

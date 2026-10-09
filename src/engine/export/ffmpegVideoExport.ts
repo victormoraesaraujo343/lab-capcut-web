@@ -38,7 +38,7 @@ export async function exportVideoWithFfmpeg(
   exact.height = config.height;
   const exactCtx = exact.getContext('2d');
   if (!exactCtx) throw new Error('canvas-2d-unavailable');
-  const provider = createPreviewFrameProvider();
+  const provider = createPreviewFrameProvider({ proxiesEnabled: () => false });
   const total = Math.max(1, frameCount(config));
   const written: string[] = [];
   const outputName = videoOutputName(config.format);

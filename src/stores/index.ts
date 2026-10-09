@@ -31,3 +31,6 @@ export * from './recordingCommands';
 export * from './beatCommands';
 export * from './stickerCommands';
 export * from './overlayCommands';
+export { useProxySettingsStore } from './proxySettingsStore';
+export type { ProxySettingsState } from './proxySettingsStore';
+export * from './proxyCommands';

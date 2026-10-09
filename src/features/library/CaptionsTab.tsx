@@ -3,6 +3,7 @@
 import { useMemo, useState, type ChangeEvent } from 'react';
 import { Wand2 } from 'lucide-react';
 import type { TranscribeLanguage, WhisperModelSize } from '@/engine/captions/transcribeProtocol';
+import { canFetchLocalAssets } from '@/engine/env/runtimeEnv';
 import { t } from '@/i18n/pt-BR';
 import { usePlaybackStore } from '@/stores/playbackStore';
 import { useProjectStore } from '@/stores/projectStore';
@@ -105,15 +106,19 @@ export function CaptionsTab() {
         </label>
       </div>
 
-      <button
-        type="button"
-        className={styles.generate}
-        disabled={running || project === null}
-        onClick={() => start({ source: effectiveSource, language, model })}
-      >
-        <Wand2 size={16} strokeWidth={1.75} aria-hidden="true" />
-        <span>{t.captions.generate}</span>
-      </button>
+      {canFetchLocalAssets() ? (
+        <button
+          type="button"
+          className={styles.generate}
+          disabled={running || project === null}
+          onClick={() => start({ source: effectiveSource, language, model })}
+        >
+          <Wand2 size={16} strokeWidth={1.75} aria-hidden="true" />
+          <span>{t.captions.generate}</span>
+        </button>
+      ) : (
+        <p className={styles.hint} role="note">{t.env.needsWebAddress}</p>
+      )}
       <p className={styles.privacy}>{t.captions.privacy}</p>
 
       {running ? (

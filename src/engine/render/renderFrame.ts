@@ -95,7 +95,7 @@ export async function renderFrame(
   const settled = await Promise.allSettled(
     jobs.map((job) =>
       provider
-        .getFrame(job.asset, job.mediaTimeMs, { exact: options.exact, rate: job.rate })
+        .getFrame(job.asset, job.mediaTimeMs, { exact: options.exact, rate: job.rate, lane: job.key })
         .then((frame) => ({ key: job.key, frame })),
     ),
   );
@@ -191,12 +191,32 @@ function assembleLayers(
 /** Pré-carrega quadros ao redor do instante para as camadas que estão tocando. */
 export function prefetchAround(project: Project, timelineMs: number, provider: FrameProvider, direction: 1 | -1): void {
   const assets = new Map<string, Asset>(project.assets.map((asset) => [asset.id, asset]));
-  for (const layer of resolveLayers(project, timelineMs)) {
+  const current = resolveLayers(project, timelineMs);
+  for (const layer of current) {
     if (!layer.assetId) continue;
     const asset = assets.get(layer.assetId);
-    if (asset) provider.prefetch(asset, layer.mediaTimeMs, direction);
+    if (asset) provider.prefetch(asset, layer.mediaTimeMs, direction, layer.clipId);
+  }
+  // Clipes que começam logo adiante: aquece o decodificador deles (pedinte próprio) no início, antes do corte.
+  if (direction !== 1) return;
+  const horizon = timelineMs + PREFETCH_AHEAD_MS;
+  for (const track of project.tracks) {
+    for (const clip of track.clips) {
+      if (clip.assetId === undefined || clip.startMs <= timelineMs || clip.startMs > horizon) continue;
+      const layer = resolveLayers(project, clip.startMs).find((candidate) => candidate.clipId === clip.id);
+      const asset = assets.get(clip.assetId);
+      // Se o mesmo vídeo já ocupa as vagas de decodificador agora, aquecer o próximo clipe tomaria uma delas.
+      const busy = current.filter((candidate) => candidate.assetId === clip.assetId).length;
+      if (layer && asset && busy < MAX_WARM_LANES) provider.prefetch(asset, layer.mediaTimeMs, direction, clip.id);
+    }
   }
 }
+
+/** Quantos clipes do mesmo vídeo podem tocar juntos sem que o próximo clipe seja aquecido (igual às vagas do provedor da prévia). */
+const MAX_WARM_LANES = 2;
+
+/** Quanto adiante, em ms, olhar para pré-carregar o próximo clipe antes do corte. */
+const PREFETCH_AHEAD_MS = 700;
 
 /** Solta todos os quadros obtidos do provider. */
 function releaseAll(provider: FrameProvider, frames: FrameImage[]): void {

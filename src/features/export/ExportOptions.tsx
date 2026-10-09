@@ -1,4 +1,5 @@
 // Campos de configuração da exportação: nome, formato, resolução, fps, qualidade e tamanho estimado.
+import { canFetchLocalAssets } from '../../engine/env/runtimeEnv';
 import { t } from '../../i18n/pt-BR';
 import { useProjectStore } from '../../stores/projectStore';
 import type { ExportFormat, ExportSettings, ResolutionPreset, BitratePreset } from '../../types/export';
@@ -65,6 +66,8 @@ export interface ExportOptionsProps {
   showFallback: boolean;
   /** Mostra o aviso de arquivo grande (acima de 1,5 GB estimados). */
   showLargeFileWarning: boolean;
+  /** Mostra o aviso de que o MP4 sairá com áudio Opus (aberto do arquivo e sem AAC no navegador). */
+  showOpusNotice?: boolean;
   /** Recebe só os campos alterados. */
   onChange: (patch: Partial<ExportSettings>) => void;
 }
@@ -78,7 +81,7 @@ function Segmented<T extends string | number>({
   disabled = false,
 }: {
   label: string;
-  options: ReadonlyArray<{ value: T; label: string }>;
+  options: ReadonlyArray<{ value: T; label: string; disabled?: boolean }>;
   value: T;
   onChange: (next: T) => void;
   disabled?: boolean;
@@ -93,7 +96,7 @@ function Segmented<T extends string | number>({
             type="button"
             role="radio"
             aria-checked={selected}
-            disabled={disabled}
+            disabled={disabled || option.disabled === true}
             className={selected ? `${styles.segment} ${styles.segmentOn}` : styles.segment}
             onClick={() => onChange(option.value)}
           >
@@ -113,8 +116,13 @@ export function ExportOptions({
   showGifLimit,
   showFallback,
   showLargeFileWarning,
+  showOpusNotice = false,
   onChange,
 }: ExportOptionsProps) {
+  const mp3Blocked = !canFetchLocalAssets();
+  const formatOptions = FORMAT_OPTIONS.map((option) =>
+    option.value === 'mp3' && mp3Blocked ? { ...option, disabled: true } : option,
+  );
   const audioOnly = settings.format === 'wav' || settings.format === 'mp3';
   const gif = settings.format === 'gif';
   // Falas sintéticas tocam na prévia mas não entram no arquivo: avisa quando o projeto tem alguma.
@@ -145,7 +153,7 @@ export function ExportOptions({
         <span className={styles.label}>{t.export.format}</span>
         <Segmented
           label={t.export.format}
-          options={FORMAT_OPTIONS}
+          options={formatOptions}
           value={settings.format}
           onChange={(format) => onChange({ format })}
         />
@@ -214,6 +222,8 @@ export function ExportOptions({
 
       {showGifLimit && <p className={styles.notice} role="note">{t.export.gifLimit}</p>}
       {showFallback && <p className={styles.notice} role="note">{t.export.fallbackNotice}</p>}
+      {mp3Blocked && <p className={styles.notice} role="note">{t.export.mp3NeedsWebAddress}</p>}
+      {showOpusNotice && <p className={styles.notice} role="note">{t.export.fileOpusNotice}</p>}
       {showLargeFileWarning && <p className={styles.notice} role="note">{t.export.largeFileWarning}</p>}
       {hasSpeech && <p className={styles.notice} role="note">{t.tts.exportNotice}</p>}
     </div>

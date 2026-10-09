@@ -1,5 +1,6 @@
 import type { MediaRequest, MediaResponse } from '../workers/mediaProtocol';
 import { MediaImportError } from './errors';
+import MediaWorker from '../workers/media.worker?worker&inline';
 
 const THUMB_BATCH_SIZE = 10;
 const THUMB_MAX_COUNT = 300;
@@ -26,9 +27,7 @@ function getWorker(): Worker {
   if (worker) {
     return worker;
   }
-  const created = new Worker(new URL('../workers/media.worker.ts', import.meta.url), {
-    type: 'module',
-  });
+  const created = new MediaWorker();
   created.onmessage = (event: MessageEvent<MediaResponse>) => {
     const response = event.data;
     const entry = pending.get(response.requestId);

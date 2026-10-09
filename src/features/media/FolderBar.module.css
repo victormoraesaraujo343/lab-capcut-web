@@ -13,7 +13,7 @@
   height: 26px;
   max-width: 160px;
   padding: 0 var(--space-2);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-control);
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-muted);
@@ -69,7 +69,7 @@
   gap: var(--space-1);
   height: 26px;
   padding: 0 var(--space-2);
-  border: 1px dashed var(--border);
+  border: 1px dashed var(--border-control);
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-muted);

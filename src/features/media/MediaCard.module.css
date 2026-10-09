@@ -175,3 +175,39 @@
   margin: var(--space-1) 0;
   background: var(--border);
 }
+
+/* Mídia ausente: véu sobre a miniatura e botão para localizar o arquivo. */
+.missingBadge {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-1);
+  background: rgba(0, 0, 0, 0.72);
+  color: var(--danger);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  text-align: center;
+}
+
+.locateButton {
+  margin: 0 var(--space-1) var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.locateButton:hover {
+  background: var(--bg-hover);
+}
+
+.locateButton:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}

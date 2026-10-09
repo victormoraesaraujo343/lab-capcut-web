@@ -1,6 +1,6 @@
 // Processador do portão de ruído, rodando na thread de áudio (AudioWorklet 'noise-gate').
 // Usa a lógica pura de ../noiseGate.ts, com um estado por canal. Os parâmetros chegam em processorOptions.
-// Empacotado pelo Vite via `?worker&url` (ver denoise.ts), que gera um script JS único em dist/assets.
+// Empacotado pelo plugin `?worklet-data` (ver denoise.ts e scripts/workletDataUrl.ts) como URL data:, que carrega em dev, http e file://.
 
 import { createGateState, DEFAULT_GATE_PARAMS, processGate, type GateParams, type GateState } from '../noiseGate';
 
