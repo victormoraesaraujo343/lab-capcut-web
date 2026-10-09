@@ -331,3 +331,58 @@ describe('camadas de texto', () => {
     expect(layers[1]?.zIndex).toBeGreaterThan(layers[0]?.zIndex ?? 0);
   });
 });
+
+describe('velocidade por curva e limite da mídia', () => {
+  it('usa a curva de velocidade quando o modo é curve', () => {
+    const curve = { mode: 'curve' as const, value: 1, curve: [{ t: 0, speed: 2 }, { t: 1, speed: 2 }], preservePitch: true };
+    expect(clipMediaTime(makeClip({ speed: curve }), 500)).toBeCloseTo(1000);
+  });
+
+  it('prende o tempo de mídia ao fim do asset quando a transição pede além dele', () => {
+    const clip = makeClip({ trimInMs: 9000 });
+    expect(clipMediaTime(clip, 2000, 10000)).toBe(10000);
+    expect(clipMediaTime(clip, -5000, 10000)).toBe(4000);
+  });
+});
+
+describe('parâmetros animados e máscara', () => {
+  it('avalia o parâmetro numérico do efeito pelo keyframe fx:<id>:<param>', () => {
+    const clip = makeClip({
+      effects: [{ id: 'fx1', type: 'brightness', params: { amount: 0, label: 'x' } }],
+      keyframes: {
+        'fx:fx1:amount': [
+          { timeMs: 0, value: 0, easing: 'linear' },
+          { timeMs: 1000, value: 1, easing: 'linear' },
+        ],
+      },
+    });
+    const layers = resolveLayers(makeProject([makeTrack('v', 'video', [clip])], [makeAsset()]), 500);
+    expect(layers[0]?.effects[0]?.params['amount']).toBeCloseTo(0.5);
+    expect(layers[0]?.effects[0]?.params['label']).toBe('x');
+  });
+
+  it('mantém o valor salvo quando o parâmetro não tem keyframes', () => {
+    const clip = makeClip({ effects: [{ id: 'fx1', type: 'brightness', params: { amount: 0.3 } }] });
+    const layers = resolveLayers(makeProject([makeTrack('v', 'video', [clip])], [makeAsset()]), 500);
+    expect(layers[0]?.filters).toEqual([]);
+    expect(layers[0]?.effects[0]?.params['amount']).toBe(0.3);
+  });
+
+  it('põe a máscara do removeBackground no mesmo tempo de mídia do clipe', () => {
+    const clip = makeClip({
+      trimInMs: 200,
+      effects: [{ id: 'fx1', type: 'removeBackground', params: { matteAssetId: 'm1' } }],
+    });
+    const matte = makeAsset({ id: 'm1', role: 'matte', sourceAssetId: 'a1' });
+    const layers = resolveLayers(makeProject([makeTrack('v', 'video', [clip])], [makeAsset(), matte]), 500);
+    expect(layers[0]?.matte).toEqual({ assetId: 'm1', mediaTimeMs: 700 });
+  });
+
+  it('não põe máscara quando o asset de máscara não existe no projeto', () => {
+    const clip = makeClip({
+      effects: [{ id: 'fx1', type: 'removeBackground', params: { matteAssetId: 'nope' } }],
+    });
+    const layers = resolveLayers(makeProject([makeTrack('v', 'video', [clip])], [makeAsset()]), 500);
+    expect(layers[0]?.matte).toBeUndefined();
+  });
+});

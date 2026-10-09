@@ -1,7 +1,7 @@
 // Tipos do motor de render: camadas resolvidas, fontes de quadro e compositor.
 // Contrato compartilhado entre composição, decodificação, compositor e prévia/exportação.
 import type { Asset, AssetKind, TextData, Transform } from './project';
-import type { EffectInstance } from './effects';
+import type { EffectInstance, ParamValue } from './effects';
 
 /** Imagem que o compositor sabe enviar como textura. */
 export type FrameImage = VideoFrame | ImageBitmap | HTMLVideoElement | HTMLImageElement | HTMLCanvasElement | OffscreenCanvas;
@@ -36,6 +36,14 @@ export interface Layer {
   fit: 'contain' | 'none';
   /** Só para camadas de texto: o conteúdo/estilo e quanto do texto já apareceu (0..1, animação de digitação). */
   text?: { data: TextData; reveal: number };
+  /** Máscara de recorte (efeito 'removeBackground'): quadro de um asset de máscara no mesmo instante de mídia. */
+  matte?: { assetId: string; mediaTimeMs: number };
+  /**
+   * Transição em andamento: esta camada é a que SAI; `incoming` é a camada que ENTRA (já com seus efeitos/transform).
+   * O compositor desenha as duas no quadro inteiro e combina com o shader da transição. A camada que entra NÃO aparece
+   * separada na lista.
+   */
+  transition?: { type: string; params: Record<string, ParamValue>; progress: number; incoming: Layer };
 }
 
 /** Desenha texto num canvas 2D (funciona na thread principal e em worker). Mesmo desenho na prévia e na exportação. */

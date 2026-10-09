@@ -14,3 +14,8 @@ export type { TimelineTool } from './timelineStore';
 export * from './timelineCommands';
 export * from './previewOverrideStore';
 export * from './textCommands';
+export * from './transitionCommands';
+export * from './keyframeCommands';
+export * from './effectCommands';
+export { setClipSpeed, setSpeedCurve, applySpeedPreset, setPreservePitch } from './speedCommands';
+export * from './jobsStore';

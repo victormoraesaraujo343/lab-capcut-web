@@ -14,12 +14,16 @@ export interface RenderFrameOptions {
   background?: string;
 }
 
-/** Camada com o quadro já obtido do provider. */
-interface FetchedLayer {
-  /** Camada de origem. */
-  layer: Layer;
-  /** Quadro obtido, nunca null. */
-  frame: FrameImage;
+/** Pedido de quadro de mídia: a chave é a da imagem no compositor (clipId ou `${clipId}:matte`). */
+interface FrameJob {
+  /** Chave da imagem no mapa do compositor. */
+  key: string;
+  /** Asset de origem. */
+  asset: Asset;
+  /** Instante de mídia pedido, em ms. */
+  mediaTimeMs: number;
+  /** Velocidade de reprodução da mídia. */
+  rate: number;
 }
 
 /** Rasterizador padrão do contexto (thread principal ou worker), criado só na primeira camada de texto. */
@@ -29,6 +33,27 @@ let sharedRasterizer: TextRasterizer | null = null;
 function defaultRasterizer(): TextRasterizer {
   sharedRasterizer ??= createTextRasterizer();
   return sharedRasterizer;
+}
+
+/** Camada e, se houver transição, a que entra: as duas precisam de imagem. */
+function layerFamily(layer: Layer): Layer[] {
+  return layer.transition ? [layer, layer.transition.incoming] : [layer];
+}
+
+/** Lista os quadros a buscar: a imagem de cada camada (e da que entra) e a máscara de recorte, quando houver. */
+function collectJobs(layers: Layer[], assets: Map<string, Asset>): FrameJob[] {
+  const jobs: FrameJob[] = [];
+  for (const layer of layers) {
+    for (const item of layerFamily(layer)) {
+      const asset = item.assetId ? assets.get(item.assetId) : undefined;
+      if (asset) jobs.push({ key: item.clipId, asset, mediaTimeMs: item.mediaTimeMs, rate: item.playbackRate });
+      if (item.matte) {
+        const matteAsset = assets.get(item.matte.assetId);
+        if (matteAsset) jobs.push({ key: `${item.clipId}:matte`, asset: matteAsset, mediaTimeMs: item.matte.mediaTimeMs, rate: 1 });
+      }
+    }
+  }
+  return jobs;
 }
 
 /**
@@ -46,38 +71,34 @@ export async function renderFrame(
   if (!(options.scale > 0)) throw new Error('invalid-render-scale');
   const layers = resolveLayers(project, timelineMs);
   const assets = new Map<string, Asset>(project.assets.map((asset) => [asset.id, asset]));
-
-  const requests: Array<{ layer: Layer; asset: Asset }> = [];
-  for (const layer of layers) {
-    if (!layer.assetId) continue;
-    const asset = assets.get(layer.assetId);
-    if (asset) requests.push({ layer, asset });
-  }
+  const jobs = collectJobs(layers, assets);
 
   const settled = await Promise.allSettled(
-    requests.map(({ layer, asset }) =>
+    jobs.map((job) =>
       provider
-        .getFrame(asset, layer.mediaTimeMs, { exact: options.exact, rate: layer.playbackRate })
-        .then((frame) => ({ layer, frame })),
+        .getFrame(job.asset, job.mediaTimeMs, { exact: options.exact, rate: job.rate })
+        .then((frame) => ({ key: job.key, frame })),
     ),
   );
 
-  const fetched: FetchedLayer[] = [];
+  const frames = new Map<string, FrameImage>();
+  const owned: FrameImage[] = [];
   let failure: { reason: unknown } | null = null;
   for (const result of settled) {
     if (result.status === 'rejected') {
       failure ??= { reason: result.reason };
     } else if (result.value.frame) {
-      fetched.push({ layer: result.value.layer, frame: result.value.frame });
+      frames.set(result.value.key, result.value.frame);
+      owned.push(result.value.frame);
     }
   }
   if (failure) {
-    releaseAll(provider, fetched);
+    releaseAll(provider, owned);
     throw failure.reason;
   }
 
   try {
-    const { drawn, images } = assembleLayers(layers, fetched, textRasterizer);
+    const { drawn, images } = assembleLayers(layers, frames, () => textRasterizer ?? defaultRasterizer());
     compositor.draw(drawn, images, {
       width: Math.round(project.width * options.scale),
       height: Math.round(project.height * options.scale),
@@ -87,35 +108,52 @@ export async function renderFrame(
     });
     return drawn;
   } finally {
-    releaseAll(provider, fetched);
+    releaseAll(provider, owned);
   }
+}
+
+/** Põe uma camada no mapa de imagens (texto é rasterizado; mídia usa o quadro obtido e a máscara). Null sem imagem. */
+function place(
+  layer: Layer,
+  frames: Map<string, FrameImage>,
+  images: Map<string, FrameImage>,
+  rasterizer: () => TextRasterizer,
+): Layer | null {
+  if (layer.text) {
+    const surface = rasterizer().rasterize(layer.text.data, layer.text.reveal);
+    images.set(layer.clipId, surface);
+    return { ...layer, sourceWidth: surface.width, sourceHeight: surface.height };
+  }
+  const frame = frames.get(layer.clipId);
+  if (frame === undefined) return null;
+  images.set(layer.clipId, frame);
+  const matte = frames.get(`${layer.clipId}:matte`);
+  if (matte !== undefined) images.set(`${layer.clipId}:matte`, matte);
+  return layer;
 }
 
 /**
  * Junta as camadas na ordem de resolução: quadros obtidos e textos rasterizados.
- * Camada de texto recebe o tamanho da imagem como tamanho natural.
+ * Transição: a camada que sai carrega a que entra (já com imagem própria); a que entra não vai separada na lista.
  */
 function assembleLayers(
   layers: Layer[],
-  fetched: FetchedLayer[],
-  textRasterizer: TextRasterizer | undefined,
+  frames: Map<string, FrameImage>,
+  rasterizer: () => TextRasterizer,
 ): { drawn: Layer[]; images: Map<string, FrameImage> } {
-  const frames = new Map<Layer, FrameImage>(fetched.map((item) => [item.layer, item.frame]));
   const drawn: Layer[] = [];
   const images = new Map<string, FrameImage>();
   for (const layer of layers) {
-    if (layer.text) {
-      const rasterizer = textRasterizer ?? defaultRasterizer();
-      const surface = rasterizer.rasterize(layer.text.data, layer.text.reveal);
-      drawn.push({ ...layer, sourceWidth: surface.width, sourceHeight: surface.height });
-      images.set(layer.clipId, surface);
+    const transition = layer.transition;
+    if (!transition) {
+      const placed = place(layer, frames, images, rasterizer);
+      if (placed) drawn.push(placed);
       continue;
     }
-    const frame = frames.get(layer);
-    if (frame !== undefined) {
-      drawn.push(layer);
-      images.set(layer.clipId, frame);
-    }
+    const outgoing = place(layer, frames, images, rasterizer);
+    const incoming = place(transition.incoming, frames, images, rasterizer);
+    if (!outgoing && !incoming) continue;
+    drawn.push({ ...(outgoing ?? layer), transition: { ...transition, incoming: incoming ?? transition.incoming } });
   }
   return { drawn, images };
 }
@@ -130,9 +168,9 @@ export function prefetchAround(project: Project, timelineMs: number, provider: F
   }
 }
 
-/** Solta todos os quadros obtidos. */
-function releaseAll(provider: FrameProvider, fetched: FetchedLayer[]): void {
-  for (const item of fetched) {
-    provider.releaseFrame(item.frame);
+/** Solta todos os quadros obtidos do provider. */
+function releaseAll(provider: FrameProvider, frames: FrameImage[]): void {
+  for (const frame of frames) {
+    provider.releaseFrame(frame);
   }
 }

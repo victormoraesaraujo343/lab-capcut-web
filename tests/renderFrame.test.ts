@@ -278,4 +278,78 @@ describe('renderFrame', () => {
     expect(compositor.calls[0]?.layers.map((layer) => layer.clipId)).toEqual(['c1', 't1']);
     expect(provider.released).toEqual([frame]);
   });
+
+  it('busca a imagem da camada que entra numa transição e a entrega junto da que sai', async () => {
+    const incoming = { ...makeLayer('c2', 'a2', 0), mediaTimeMs: 2000 };
+    const outgoing: Layer = {
+      ...makeLayer('c1', 'a1', 0),
+      transition: { type: 'fade', params: {}, progress: 0.25, incoming },
+    };
+    resolveLayersMock.mockReturnValue([outgoing]);
+    const f1 = document.createElement('canvas');
+    const f2 = document.createElement('canvas');
+    const provider = makeProvider(
+      new Map<string, FrameImage | null>([
+        ['a1', f1],
+        ['a2', f2],
+      ]),
+    );
+    const compositor = makeCompositor();
+
+    const drawn = await renderFrame(compositor, makeProject([makeAsset('a1'), makeAsset('a2')]), 0, provider, {
+      scale: 1,
+      exact: true,
+    });
+
+    expect(provider.requested.sort()).toEqual(['a1', 'a2']);
+    expect(compositor.calls[0]?.keys.sort()).toEqual(['c1', 'c2']);
+    expect(drawn).toHaveLength(1);
+    expect(drawn[0]?.transition?.incoming.clipId).toBe('c2');
+    expect(provider.released).toEqual([f1, f2]);
+  });
+
+  it('rasteriza o texto que entra numa transição e atualiza o tamanho dele', async () => {
+    const data = { content: 'oi' } as unknown as TextData;
+    const incoming: Layer = { ...makeLayer('t2', undefined, 0), kind: 'text', fit: 'none', text: { data, reveal: 1 } };
+    const outgoing: Layer = { ...makeLayer('c1', 'a1', 0), transition: { type: 'wipe', params: {}, progress: 0.5, incoming } };
+    resolveLayersMock.mockReturnValue([outgoing]);
+    const frame = document.createElement('canvas');
+    const provider = makeProvider(new Map<string, FrameImage | null>([['a1', frame]]));
+    const compositor = makeCompositor();
+    const image = document.createElement('canvas');
+    image.width = 200;
+    image.height = 50;
+    const rasterizer: TextRasterizer = {
+      rasterize: vi.fn(() => image),
+      measure: vi.fn(() => ({ width: 200, height: 50 })),
+      dispose: vi.fn(),
+    };
+
+    const drawn = await renderFrame(compositor, makeProject([makeAsset('a1')]), 0, provider, { scale: 1, exact: true }, rasterizer);
+
+    expect(rasterizer.rasterize).toHaveBeenCalledWith(data, 1);
+    expect(drawn[0]?.transition?.incoming).toMatchObject({ clipId: 't2', sourceWidth: 200, sourceHeight: 50 });
+    expect(compositor.calls[0]?.keys.sort()).toEqual(['c1', 't2']);
+  });
+
+  it('busca a máscara da camada, passa como `${clipId}:matte` e a libera depois', async () => {
+    const withMatte: Layer = { ...makeLayer('c1', 'a1', 0), matte: { assetId: 'm1', mediaTimeMs: 500 } };
+    resolveLayersMock.mockReturnValue([withMatte]);
+    const frame = document.createElement('canvas');
+    const matte = document.createElement('canvas');
+    const provider = makeProvider(
+      new Map<string, FrameImage | null>([
+        ['a1', frame],
+        ['m1', matte],
+      ]),
+    );
+    const spy = vi.spyOn(provider, 'getFrame');
+    const compositor = makeCompositor();
+
+    await renderFrame(compositor, makeProject([makeAsset('a1'), makeAsset('m1')]), 0, provider, { scale: 1, exact: true });
+
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ id: 'm1' }), 500, { exact: true, rate: 1 });
+    expect(compositor.calls[0]?.keys.sort()).toEqual(['c1', 'c1:matte']);
+    expect(provider.released).toEqual([frame, matte]);
+  });
 });

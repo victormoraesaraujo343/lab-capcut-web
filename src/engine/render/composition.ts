@@ -1,8 +1,21 @@
 // Composição pura: quais camadas aparecem num instante, com tempo de mídia, keyframes e transformação avaliada.
 
-import type { Asset, Clip, Layer, Project, TextData, Track, Transform } from '@/types';
+import type {
+  Asset,
+  Clip,
+  EffectInstance,
+  KeyframeMap,
+  Layer,
+  ParamValue,
+  Project,
+  TextData,
+  Track,
+  Transform,
+} from '@/types';
 import { clipEndMs } from '@/types';
-import { evaluateTransform } from './keyframes';
+import { mediaOffsetAt } from '@/engine/timeline/speedCurve';
+import { evaluateNumber, evaluateTransform } from './keyframes';
+import { applyTransitions } from './compositionTransitions';
 import { evaluateTextAnimation, type TextAnimState } from '../text/textAnimations';
 
 /** Clipe com som ativo no instante, com o tempo de mídia a tocar. */
@@ -16,12 +29,15 @@ export interface ActiveAudioClip {
 }
 
 /** Tipos de trilha que geram camadas visuais (áudio nunca entra). */
-const VISUAL_TRACK_KINDS: ReadonlySet<Track['kind']> = new Set<Track['kind']>([
+export const VISUAL_TRACK_KINDS: ReadonlySet<Track['kind']> = new Set<Track['kind']>([
   'video',
   'sticker',
   'text',
   'effect',
 ]);
+
+/** Nome do efeito que recorta o fundo com uma máscara. */
+const MATTE_EFFECT_TYPE = 'removeBackground';
 
 /** Instante local do clipe (0 = início) se o instante da timeline cai dentro dele; senão null. */
 export function clipLocalTime(clip: Clip, timelineMs: number): number | null {
@@ -29,17 +45,25 @@ export function clipLocalTime(clip: Clip, timelineMs: number): number | null {
   return timelineMs - clip.startMs;
 }
 
+/** Prende um instante de mídia a [0, duração do asset]; sem duração conhecida, só não fica negativo. */
+function clampMediaTime(ms: number, assetDurationMs: number | undefined): number {
+  const floored = Math.max(0, ms);
+  return assetDurationMs === undefined ? floored : Math.min(floored, assetDurationMs);
+}
+
 /**
- * Instante da mídia original a mostrar para um instante local do clipe.
- * A curva de velocidade (modo 'curve') entra na etapa 7; por enquanto usa speed.value nos dois modos.
+ * Instante da mídia original a mostrar para um instante local do clipe, com velocidade constante ou por curva.
+ * O resultado fica preso a [0, duração do asset] quando ela é conhecida (transições podem pedir além do fim).
  */
-export function clipMediaTime(clip: Clip, localMs: number): number {
+export function clipMediaTime(clip: Clip, localMs: number, assetDurationMs?: number): number {
   if (clip.freezeFrameMs !== undefined) return clip.freezeFrameMs;
-  const speed = clip.speed.value;
-  if (clip.reversed) {
-    return Math.max(clip.trimInMs, clip.trimInMs + (clip.durationMs - localMs) * speed);
-  }
-  return clip.trimInMs + localMs * speed;
+  const offset = mediaOffsetAt(
+    clip.speed,
+    clip.reversed ? clip.durationMs - localMs : localMs,
+    clip.durationMs,
+  );
+  const consumed = clip.reversed ? Math.max(0, offset) : offset;
+  return clampMediaTime(clip.trimInMs + consumed, assetDurationMs);
 }
 
 /** Velocidade com que a mídia avança na reprodução: speed do clipe; freeze frame fica parado (0). */
@@ -81,31 +105,51 @@ function textTransform(base: Transform, data: TextData, anim: TextAnimState): Tr
   };
 }
 
-/** Monta a camada de um clipe no instante, ou null se o clipe não aparece nele. */
-function resolveClipLayer(
+/** Instância de filtro/efeito com os parâmetros numéricos avaliados nos keyframes 'fx:<id>:<param>' no instante local. */
+function evaluateInstance(inst: EffectInstance, keyframes: KeyframeMap, localMs: number): EffectInstance {
+  const params: Record<string, ParamValue> = {};
+  for (const [key, value] of Object.entries(inst.params)) {
+    params[key] =
+      typeof value === 'number' ? evaluateNumber(keyframes, `fx:${inst.id}:${key}`, localMs, value) : value;
+  }
+  return { ...inst, params };
+}
+
+/** Máscara de recorte do clipe: o asset indicado no efeito 'removeBackground', se existir no projeto; senão undefined. */
+function matteFor(clip: Clip, assets: Map<string, Asset>, mediaTimeMs: number): Layer['matte'] {
+  const effect = clip.effects.find((e) => e.type === MATTE_EFFECT_TYPE);
+  const assetId = effect?.params['matteAssetId'];
+  if (typeof assetId !== 'string' || !assets.has(assetId)) return undefined;
+  return { assetId, mediaTimeMs };
+}
+
+/**
+ * Monta a camada de um clipe num instante LOCAL dado, sem checar se o clipe está ativo ali
+ * (as transições usam instantes fora do clipe). Devolve null se o clipe não é visual.
+ */
+export function layerForClipAt(
   project: Project,
-  clip: Clip,
   assets: Map<string, Asset>,
-  timelineMs: number,
+  clip: Clip,
+  localMs: number,
   zIndex: number,
 ): Layer | null {
-  const localTimeMs = clipLocalTime(clip, timelineMs);
-  if (localTimeMs === null) return null;
   const asset = clipAsset(assets, clip);
   const kind = visualKindOf(clip, asset);
   if (kind === null) return null;
-  const base = evaluateTransform(clip.transform, clip.keyframes, localTimeMs);
+  const base = evaluateTransform(clip.transform, clip.keyframes, localMs);
+  const mediaTimeMs = clipMediaTime(clip, localMs, asset?.durationMs);
   const common = {
     clipId: clip.id,
-    mediaTimeMs: clipMediaTime(clip, localTimeMs),
-    localTimeMs,
-    filters: [...clip.filters],
-    effects: [...clip.effects],
+    mediaTimeMs,
+    localTimeMs: localMs,
+    filters: clip.filters.map((f) => evaluateInstance(f, clip.keyframes, localMs)),
+    effects: clip.effects.map((e) => evaluateInstance(e, clip.keyframes, localMs)),
     zIndex,
     playbackRate: clipPlaybackRate(clip),
   };
   if (clip.text) {
-    const anim = evaluateTextAnimation(clip.text, localTimeMs, clip.durationMs, project.height);
+    const anim = evaluateTextAnimation(clip.text, localMs, clip.durationMs, project.height);
     return {
       ...common,
       kind: 'text',
@@ -116,6 +160,7 @@ function resolveClipLayer(
       text: { data: clip.text, reveal: anim.reveal },
     };
   }
+  const matte = matteFor(clip, assets, mediaTimeMs);
   return {
     ...common,
     assetId: clip.assetId,
@@ -124,12 +169,26 @@ function resolveClipLayer(
     sourceWidth: asset?.width ?? project.width,
     sourceHeight: asset?.height ?? project.height,
     fit: 'contain',
+    ...(matte === undefined ? {} : { matte }),
   };
+}
+
+/** Monta a camada de um clipe no instante da timeline, ou null se o clipe não aparece nele. */
+function resolveClipLayer(
+  project: Project,
+  clip: Clip,
+  assets: Map<string, Asset>,
+  timelineMs: number,
+  zIndex: number,
+): Layer | null {
+  const localTimeMs = clipLocalTime(clip, timelineMs);
+  if (localTimeMs === null) return null;
+  return layerForClipAt(project, assets, clip, localTimeMs, zIndex);
 }
 
 /**
  * Camadas visuais ativas no instante, ordenadas por zIndex crescente.
- * A trilha de índice 0 fica no topo: zIndex = número de trilhas - 1 - índice.
+ * A trilha de índice 0 fica no topo: zIndex = número de trilhas - 1 - índice. Transições ativas viram uma camada só.
  */
 export function resolveLayers(project: Project, timelineMs: number): Layer[] {
   const assets = assetMap(project);
@@ -143,7 +202,7 @@ export function resolveLayers(project: Project, timelineMs: number): Layer[] {
       if (layer) layers.push(layer);
     }
   });
-  return layers.sort((a, b) => a.zIndex - b.zIndex);
+  return applyTransitions(project, timelineMs, layers);
 }
 
 /** Clipes com som (trilhas áudio ou vídeo não mutadas, asset de vídeo ou áudio) ativos no instante. */
@@ -157,7 +216,7 @@ export function activeAudioClips(project: Project, timelineMs: number): ActiveAu
       if (!asset || (asset.kind !== 'video' && asset.kind !== 'audio')) continue;
       const localMs = clipLocalTime(clip, timelineMs);
       if (localMs === null) continue;
-      result.push({ clip, track, mediaTimeMs: clipMediaTime(clip, localMs) });
+      result.push({ clip, track, mediaTimeMs: clipMediaTime(clip, localMs, asset.durationMs) });
     }
   }
   return result;

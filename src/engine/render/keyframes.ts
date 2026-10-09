@@ -80,3 +80,43 @@ export function evaluateTransform(
     },
   };
 }
+
+/** Tolerância padrão, em ms, para considerar dois keyframes como o mesmo instante. */
+const DEFAULT_TOLERANCE_MS = 1;
+
+/** Ordena uma lista de keyframes pelo tempo, sem mutar a entrada. */
+function sortByTime(list: Keyframe<number>[]): Keyframe<number>[] {
+  return [...list].sort((a, b) => a.timeMs - b.timeMs);
+}
+
+/** Indica se há um keyframe no instante, dentro da tolerância em ms. */
+export function hasKeyframeAt(
+  list: Keyframe<number>[] | undefined,
+  timeMs: number,
+  toleranceMs: number = DEFAULT_TOLERANCE_MS,
+): boolean {
+  return (list ?? []).some((k) => Math.abs(k.timeMs - timeMs) <= toleranceMs);
+}
+
+/** Insere o keyframe ou substitui o que já existe no mesmo instante; a lista volta ordenada por tempo. */
+export function upsertKeyframe(list: Keyframe<number>[], kf: Keyframe<number>): Keyframe<number>[] {
+  const others = list.filter((k) => Math.abs(k.timeMs - kf.timeMs) > DEFAULT_TOLERANCE_MS);
+  return sortByTime([...others, kf]);
+}
+
+/** Remove os keyframes do instante (dentro da tolerância); devolve a lista ordenada sem eles. */
+export function removeKeyframeAt(
+  list: Keyframe<number>[],
+  timeMs: number,
+  toleranceMs: number = DEFAULT_TOLERANCE_MS,
+): Keyframe<number>[] {
+  return list.filter((k) => Math.abs(k.timeMs - timeMs) > toleranceMs);
+}
+
+/** Leva o keyframe de fromMs para toMs, substituindo o que estiver em toMs. Sem keyframe em fromMs, devolve a lista igual. */
+export function moveKeyframe(list: Keyframe<number>[], fromMs: number, toMs: number): Keyframe<number>[] {
+  const source = list.find((k) => Math.abs(k.timeMs - fromMs) <= DEFAULT_TOLERANCE_MS);
+  if (!source) return list;
+  const rest = list.filter((k) => k !== source && Math.abs(k.timeMs - toMs) > DEFAULT_TOLERANCE_MS);
+  return sortByTime([...rest, { ...source, timeMs: toMs }]);
+}

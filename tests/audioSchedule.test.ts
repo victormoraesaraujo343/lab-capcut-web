@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { clipGainAt, computeSegments } from '../src/engine/audio/audioSchedule';
+import { trimPassed } from '../src/engine/audio/audioNodes';
 import {
   defaultAudioFx,
   defaultSpeed,
@@ -177,5 +178,80 @@ describe('clipGainAt', () => {
     expect(clipGainAt(base, 600)).toBeCloseTo(2);
     expect(clipGainAt(base, 800)).toBeCloseTo(1);
     expect(clipGainAt(base, 1000)).toBeCloseTo(0);
+  });
+});
+
+describe('computeSegments com curva de velocidade', () => {
+  // Rampa de 1x a 3x num clipe de 1000 ms: a mídia avança 750 ms até o meio e 2000 ms no total.
+  const ramp = { mode: 'curve' as const, value: 1, preservePitch: false, curve: [{ t: 0, speed: 1 }, { t: 1, speed: 3 }] };
+
+  it('calcula o offset pela integral da curva e a duração do trecho inteiro', () => {
+    const clip = makeClip({ id: 'k1', trackId: 't1', startMs: 0, durationMs: 1000, speed: ramp });
+    const project = makeProject([makeTrack({ id: 't1', kind: 'audio', clips: [clip] })], [makeAsset('a1', 'audio')]);
+    const [segment] = computeSegments(project, 0);
+    expect(segment?.offsetInMediaMs).toBeCloseTo(0, 6);
+    expect(segment?.durationMs).toBe(1000);
+    expect(segment?.playbackRate).toBe(1);
+  });
+
+  it('a partir do meio do clipe, começa com o offset da integral até ali', () => {
+    const clip = makeClip({ id: 'k2', trackId: 't1', startMs: 0, durationMs: 1000, speed: ramp });
+    const project = makeProject([makeTrack({ id: 't1', kind: 'audio', clips: [clip] })], [makeAsset('a1', 'audio')]);
+    const [segment] = computeSegments(project, 500);
+    expect(segment?.offsetInMediaMs).toBeCloseTo(750, 6);
+    expect(segment?.durationMs).toBe(500);
+    expect(segment?.curve?.localStartMs).toBe(500);
+  });
+
+  it('ao cortar o começo de um trecho com curva, o offset segue a integral e não a taxa do início', () => {
+    const clip = makeClip({ id: 'k3', trackId: 't1', startMs: 0, durationMs: 1000, speed: ramp });
+    const project = makeProject([makeTrack({ id: 't1', kind: 'audio', clips: [clip] })], [makeAsset('a1', 'audio')]);
+    const [segment] = computeSegments(project, 500);
+    const trimmed = segment ? trimPassed(segment, 700) : null;
+    // Integral de 0,5 a 0,7 de (1 + 2u), vezes 1000 ms: 440 ms a mais, a partir de 750.
+    expect(trimmed?.offsetInMediaMs).toBeCloseTo(1190, 6);
+    expect(trimmed?.durationMs).toBe(300);
+    expect(trimmed?.curve?.localStartMs).toBe(700);
+  });
+
+  it('velocidade constante continua com o offset linear', () => {
+    const clip = makeClip({
+      id: 'k4',
+      trackId: 't1',
+      startMs: 0,
+      durationMs: 1000,
+      trimInMs: 100,
+      speed: { mode: 'constant', value: 4, curve: [], preservePitch: true },
+    });
+    const project = makeProject([makeTrack({ id: 't1', kind: 'video', clips: [clip] })], [makeAsset('a1', 'video')]);
+    const [segment] = computeSegments(project, 250);
+    expect(segment?.offsetInMediaMs).toBe(100 + 250 * 4);
+    expect(segment?.curve).toBeUndefined();
+  });
+});
+
+describe('clipGainAt com keyframes de volume', () => {
+  const keyed = makeClip({
+    id: 'v1',
+    trackId: 't1',
+    durationMs: 1000,
+    volume: 1,
+    keyframes: {
+      volume: [
+        { timeMs: 0, value: 0.5, easing: 'linear' },
+        { timeMs: 1000, value: 1.5, easing: 'linear' },
+      ],
+    },
+  });
+
+  it('usa o valor interpolado dos keyframes no lugar do volume fixo', () => {
+    expect(clipGainAt(keyed, 0)).toBeCloseTo(0.5, 9);
+    expect(clipGainAt(keyed, 500)).toBeCloseTo(1, 9);
+    expect(clipGainAt(keyed, 1000)).toBeCloseTo(1.5, 9);
+  });
+
+  it('multiplica o volume do keyframe pelo fade', () => {
+    const faded = { ...keyed, audio: { ...defaultAudioFx(), fadeInMs: 200 } };
+    expect(clipGainAt(faded, 100)).toBeCloseTo(0.6 * 0.5, 9);
   });
 });

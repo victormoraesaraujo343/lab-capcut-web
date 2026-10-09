@@ -180,7 +180,10 @@ export function createPreviewAudioEngine(): PreviewAudioEngine {
         continue;
       }
       const when = current.base.ctxTime + (remaining.startAtTimelineMs - current.timelineMsAtStart) / 1000;
-      activeNodes.push(scheduleSegment(context, out, buffer, clip, remaining, when));
+      const node = scheduleSegment(context, out, buffer, clip, remaining, when);
+      if (node !== null) {
+        activeNodes.push(node);
+      }
     }
   }
 

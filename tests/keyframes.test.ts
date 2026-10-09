@@ -1,6 +1,15 @@
 // Testes puros dos keyframes: easing, valores antes/entre/depois e avaliação da transformação.
 import { describe, expect, it } from 'vitest';
-import { ease, evaluateKeyframes, evaluateNumber, evaluateTransform } from '@/engine/render/keyframes';
+import {
+  ease,
+  evaluateKeyframes,
+  evaluateNumber,
+  evaluateTransform,
+  hasKeyframeAt,
+  moveKeyframe,
+  removeKeyframeAt,
+  upsertKeyframe,
+} from '@/engine/render/keyframes';
 import { defaultTransform, type Keyframe, type KeyframeMap } from '@/types';
 
 describe('ease', () => {
@@ -82,5 +91,39 @@ describe('evaluateNumber e evaluateTransform', () => {
     expect(result.crop.left).toBe(0);
     expect(result.opacity).toBe(0.8);
     expect(result.y).toBe(0);
+  });
+});
+
+describe('edição de keyframes', () => {
+  const base: Keyframe<number>[] = [
+    { timeMs: 0, value: 0, easing: 'linear' },
+    { timeMs: 500, value: 5, easing: 'easeIn' },
+  ];
+
+  it('upsertKeyframe insere em ordem e substitui o do mesmo instante', () => {
+    const inserted = upsertKeyframe(base, { timeMs: 250, value: 2, easing: 'linear' });
+    expect(inserted.map((k) => k.timeMs)).toEqual([0, 250, 500]);
+    const replaced = upsertKeyframe(base, { timeMs: 500, value: 9, easing: 'hold' });
+    expect(replaced).toEqual([
+      { timeMs: 0, value: 0, easing: 'linear' },
+      { timeMs: 500, value: 9, easing: 'hold' },
+    ]);
+  });
+
+  it('removeKeyframeAt remove o instante dentro da tolerância', () => {
+    expect(removeKeyframeAt(base, 500.5).map((k) => k.timeMs)).toEqual([0]);
+    expect(removeKeyframeAt(base, 100)).toHaveLength(2);
+  });
+
+  it('hasKeyframeAt respeita a tolerância', () => {
+    expect(hasKeyframeAt(base, 0)).toBe(true);
+    expect(hasKeyframeAt(base, 10)).toBe(false);
+    expect(hasKeyframeAt(base, 10, 20)).toBe(true);
+    expect(hasKeyframeAt(undefined, 0)).toBe(false);
+  });
+
+  it('moveKeyframe leva o keyframe para o novo tempo e sem mexer se não houver nada em fromMs', () => {
+    expect(moveKeyframe(base, 500, 800).map((k) => k.timeMs)).toEqual([0, 800]);
+    expect(moveKeyframe(base, 123, 800)).toBe(base);
   });
 });

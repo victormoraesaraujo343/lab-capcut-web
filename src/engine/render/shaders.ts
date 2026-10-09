@@ -34,3 +34,40 @@ void main() {
   outColor = texture(u_texture, v_uv) * u_opacity;
 }
 `;
+
+/**
+ * Vertex shader dos passes (efeitos, transições e composição): quad de tela cheia em clip space.
+ * v_uv é identidade entre entrada e saída (v = 0 é a primeira linha da textura, o topo da imagem enviada),
+ * então um passe não inverte a imagem, mesmo quando escreve num framebuffer e lê dele depois.
+ */
+export const PASS_VERTEX_SHADER = `#version 300 es
+in vec2 a_position;
+out vec2 v_uv;
+
+void main() {
+  gl_Position = vec4(a_position, 0.0, 1.0);
+  v_uv = a_position * 0.5 + 0.5;
+}
+`;
+
+/**
+ * Fragment de cópia: lê u_texture em v_uv * u_scale + u_offset e devolve transparente fora de [0, 1].
+ * Com escala 1 e deslocamento 0 é cópia simples; com margem (overscan) centraliza a imagem no quadro maior.
+ */
+export const COPY_FRAGMENT_SHADER = `#version 300 es
+precision highp float;
+in vec2 v_uv;
+uniform sampler2D u_texture;
+uniform vec2 u_scale;
+uniform vec2 u_offset;
+out vec4 outColor;
+
+void main() {
+  vec2 src = v_uv * u_scale + u_offset;
+  if (src.x < 0.0 || src.y < 0.0 || src.x > 1.0 || src.y > 1.0) {
+    outColor = vec4(0.0);
+    return;
+  }
+  outColor = texture(u_texture, src);
+}
+`;

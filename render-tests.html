@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Testes de render (dev)</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f7f7f8;
+        --fg: #1b1b1f;
+        --muted: #6b6b76;
+        --line: #d9d9e0;
+        --pass: #15803d;
+        --fail: #b91c1c;
+        --created: #1d4ed8;
+        --error: #b45309;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme='light']) {
+          --bg: #111114;
+          --fg: #ececf1;
+          --muted: #9a9aa6;
+          --line: #2c2c34;
+          --pass: #4ade80;
+          --fail: #f87171;
+          --created: #93c5fd;
+          --error: #fbbf24;
+        }
+      }
+      :root[data-theme='dark'] {
+        --bg: #111114;
+        --fg: #ececf1;
+        --muted: #9a9aa6;
+        --line: #2c2c34;
+        --pass: #4ade80;
+        --fail: #f87171;
+        --created: #93c5fd;
+        --error: #fbbf24;
+      }
+      body {
+        margin: 0;
+        padding: 16px;
+        background: var(--bg);
+        color: var(--fg);
+        font: 14px/1.4 system-ui, sans-serif;
+      }
+      h1 {
+        font-size: 20px;
+        margin: 0 0 8px;
+      }
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+      button {
+        font: inherit;
+        padding: 6px 12px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--bg);
+        color: var(--fg);
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+      #summary {
+        margin: 0;
+        color: var(--muted);
+      }
+      .scroll {
+        overflow-x: auto;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        min-width: 900px;
+      }
+      th,
+      td {
+        border-bottom: 1px solid var(--line);
+        padding: 6px 8px;
+        text-align: left;
+        vertical-align: middle;
+      }
+      th {
+        color: var(--muted);
+        font-weight: 600;
+      }
+      img {
+        display: block;
+        width: 160px;
+        height: 90px;
+        object-fit: contain;
+        background: #000;
+        border-radius: 4px;
+      }
+      .empty {
+        color: var(--muted);
+      }
+      .status {
+        font-weight: 600;
+      }
+      .status.pass {
+        color: var(--pass);
+      }
+      .status.fail {
+        color: var(--fail);
+      }
+      .status.created {
+        color: var(--created);
+      }
+      .status.error {
+        color: var(--error);
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Testes de render (dev)</h1>
+    <div class="toolbar">
+      <button id="rerun" type="button">rodar de novo</button>
+      <p id="summary">Preparando…</p>
+    </div>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Caso</th>
+            <th>Situação</th>
+            <th>Pixels ruins</th>
+            <th>Maior diferença</th>
+            <th>Atual</th>
+            <th>Referência</th>
+            <th>Detalhe</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <script type="module" src="/src/devtools/renderTests/main.ts"></script>
+  </body>
+</html>

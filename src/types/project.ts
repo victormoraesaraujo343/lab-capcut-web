@@ -11,6 +11,10 @@ export interface Asset {
   id: string;
   /** Tipo de mídia. */
   kind: AssetKind;
+  /** Asset gerado pelo editor (não aparece no painel de mídia): máscara de recorte, cópia invertida ou proxy leve. */
+  role?: 'matte' | 'reversed' | 'proxy';
+  /** Para assets gerados: o asset de origem. */
+  sourceAssetId?: string;
   /** Nome original do arquivo. */
   name: string;
   /** Tipo MIME do arquivo (ex.: 'video/mp4'). */
@@ -58,7 +62,11 @@ export interface Transform {
   crop: { top: number; right: number; bottom: number; left: number };
 }
 
-/** Mapa de keyframes por propriedade. Chave = nome da propriedade (ex.: 'x', 'opacity', 'volume', 'filter:<id>:<param>'). */
+/**
+ * Mapa de keyframes por propriedade (timeMs relativo ao início do clipe). Chaves:
+ * 'x' | 'y' | 'scaleX' | 'scaleY' | 'rotation' | 'opacity' | 'crop.top' | 'crop.right' | 'crop.bottom' | 'crop.left'
+ * | 'volume' | 'fx:<id do filtro/efeito>:<parâmetro numérico>'.
+ */
 export type KeyframeMap = Record<string, Keyframe<number>[]>;
 
 /** Ponto de uma curva de velocidade. */

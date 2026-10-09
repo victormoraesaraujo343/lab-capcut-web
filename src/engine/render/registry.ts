@@ -22,6 +22,19 @@ export interface EffectParamSpec {
   options?: string[];
 }
 
+/**
+ * CONVENÇÃO DOS SHADERS (GLSL ES 3.00, `#version 300 es`, `precision highp float;`):
+ * - Filtros e efeitos ('filter' | 'effect'): `in vec2 v_uv;` (0..1, origem no canto SUPERIOR esquerdo),
+ *   `uniform sampler2D u_texture;` (imagem da camada, pré-multiplicada), `uniform vec2 u_resolution;` (px da textura),
+ *   `uniform float u_time;` (segundos desde o início do clipe), `uniform int u_pass;` (0..passes-1),
+ *   `uniform sampler2D u_matte;` + `uniform float u_hasMatte;` (máscara de recorte, efeito de remover fundo),
+ *   `out vec4 outColor;` (pré-multiplicada). Cada parâmetro vira `uniform float u_<key>` (number/boolean 0|1),
+ *   `uniform vec3 u_<key>` (color, rgb 0..1) ou `uniform int u_<key>` (select = índice da opção).
+ * - Transições ('transition'): `in vec2 v_uv;`, `uniform sampler2D u_from;` (clipe que sai), `uniform sampler2D u_to;`
+ *   (clipe que entra), `uniform float u_progress;` (0..1), `uniform vec2 u_resolution;`, parâmetros como acima, `out vec4 outColor;`.
+ * Os efeitos rodam em sequência sobre a textura da camada (ping-pong em framebuffers do tamanho da fonte),
+ * antes da transformação; transições rodam sobre o quadro inteiro das duas camadas já transformadas.
+ */
 /** Definição completa de um efeito: metadados para a UI e GLSL para o compositor. */
 export interface EffectDefinition {
   /** Identificador único do efeito (ex.: 'blur', 'brightness'). */
@@ -32,8 +45,12 @@ export interface EffectDefinition {
   labelKey: string;
   /** Parâmetros editáveis. */
   params: EffectParamSpec[];
-  /** GLSL ES 3.00 que lê u_texture e os uniforms u_<param>. */
+  /** GLSL ES 3.00 que lê u_texture e os uniforms u_<param> (veja a convenção acima). */
   fragmentSource: string;
+  /** Quantas passadas do mesmo shader (ex.: desfoque separável = 2, com u_pass 0 horizontal e 1 vertical). Padrão 1. */
+  passes?: number;
+  /** Margem extra (fração do tamanho) que o efeito precisa em volta da imagem (ex.: tremor, espelho); padrão 0. */
+  overscan?: number;
 }
 
 const effects = new Map<string, EffectDefinition>();

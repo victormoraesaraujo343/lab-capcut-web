@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mixProjectAudio, segmentsInRange } from '../src/engine/audio/offlineMix';
+import { scheduleSegment } from '../src/engine/audio/audioNodes';
+import { computeSegments } from '../src/engine/audio/audioSchedule';
 import { createPreviewAudioEngine } from '../src/engine/audio/previewAudioEngine';
 import {
   defaultAudioFx,
@@ -349,5 +351,248 @@ describe('envelope de volume: prévia e mixagem offline', () => {
       expect(call.value).toBeCloseTo(offlineCalls[index]?.value ?? Number.NaN, 9);
       expect(call.when - previewLeadS).toBeCloseTo(offlineCalls[index]?.when ?? Number.NaN, 9);
     });
+  });
+});
+
+/** Chamada de setValueCurveAtTime registrada num parâmetro falso. */
+interface CurveCall {
+  values: Float32Array;
+  when: number;
+  duration: number;
+}
+
+/** Parâmetro falso (playbackRate) que grava valores e curvas. */
+interface FakeParam {
+  value: number;
+  curveCalls: CurveCall[];
+  setValueAtTime: (value: number, when: number) => void;
+  setValueCurveAtTime: (values: Float32Array, when: number, duration: number) => void;
+}
+
+/** Fonte falsa criada pelo contexto de nós: grava buffer, taxa, início e parada. */
+interface NodeSource {
+  buffer: unknown;
+  playbackRate: FakeParam;
+  started: { when: number; offset: number } | null;
+  stopAt: number | null;
+  connect: () => void;
+  start: (when: number, offset: number) => void;
+  stop: (when: number) => void;
+}
+
+/** Contexto falso para scheduleSegment direto: registra fontes e buffers esticados criados. */
+class FakeNodeContext {
+  sources: NodeSource[] = [];
+  createdBuffers: { channels: number; length: number; data: Float32Array[] }[] = [];
+
+  createBufferSource(): NodeSource {
+    const playbackRate: FakeParam = {
+      value: 1,
+      curveCalls: [],
+      setValueAtTime: () => undefined,
+      setValueCurveAtTime(values, when, duration) {
+        this.curveCalls.push({ values, when, duration });
+      },
+    };
+    const source: NodeSource = {
+      buffer: null,
+      playbackRate,
+      started: null,
+      stopAt: null,
+      connect: () => undefined,
+      start(when, offset) {
+        this.started = { when, offset };
+      },
+      stop(when) {
+        this.stopAt = when;
+      },
+    };
+    this.sources.push(source);
+    return source;
+  }
+
+  createGain() {
+    return {
+      gain: { setValueAtTime: () => undefined, linearRampToValueAtTime: () => undefined },
+      connect: () => undefined,
+    };
+  }
+
+  createBuffer(channels: number, length: number): { copyToChannel: (data: Float32Array, channel: number) => void } {
+    const entry = { channels, length, data: [] as Float32Array[] };
+    this.createdBuffers.push(entry);
+    return {
+      copyToChannel: (data, channel) => {
+        entry.data[channel] = data;
+      },
+    };
+  }
+}
+
+/** Buffer de origem falso: um canal de silêncio com a taxa de amostragem dada. */
+function sourceBuffer(samples: number, sampleRate: number): AudioBuffer {
+  const data = new Float32Array(samples);
+  return {
+    numberOfChannels: 1,
+    sampleRate,
+    length: samples,
+    getChannelData: () => data,
+  } as unknown as AudioBuffer;
+}
+
+/** Trecho agendado de um clipe, como o motor de áudio calcularia. */
+function segmentOf(clip: Clip, fromMs = 0) {
+  const project = makeProject(
+    [makeTrack({ id: 't1', kind: 'audio', clips: [clip] })],
+    [makeAsset('a1', 'audio')],
+  );
+  const [segment] = computeSegments(project, fromMs);
+  if (!segment) throw new Error('trecho esperado');
+  return segment;
+}
+
+describe('velocidade no nó de áudio (scheduleSegment)', () => {
+  it('velocidade constante sem manter o tom usa a taxa direta do buffer original', () => {
+    const clip = makeClip({
+      id: 'n1',
+      trackId: 't1',
+      durationMs: 1000,
+      trimInMs: 100,
+      speed: { mode: 'constant', value: 2, curve: [], preservePitch: false },
+    });
+    const ctx = new FakeNodeContext();
+    const buffer = sourceBuffer(2000, 1000);
+    const node = scheduleSegment(
+      ctx as unknown as BaseAudioContext,
+      {} as AudioNode,
+      buffer,
+      clip,
+      segmentOf(clip, 250),
+      0,
+    );
+    const [source] = ctx.sources;
+    expect(node).not.toBeNull();
+    expect(ctx.createdBuffers).toHaveLength(0);
+    expect(source?.buffer).toBe(buffer);
+    expect(source?.playbackRate.value).toBe(2);
+    // Trecho de 250 ms da timeline: offset = trimIn 100 + 250 ms x 2 = 600 ms de mídia.
+    expect(source?.started).toEqual({ when: 0, offset: 0.6 });
+    expect(source?.stopAt).toBeCloseTo(0.75, 9);
+  });
+
+  it('velocidade constante mantendo o tom usa o buffer esticado e taxa residual 1', () => {
+    const clip = makeClip({
+      id: 'n2',
+      trackId: 't1',
+      durationMs: 1000,
+      speed: { mode: 'constant', value: 2, curve: [], preservePitch: true },
+    });
+    const ctx = new FakeNodeContext();
+    const buffer = sourceBuffer(2000, 1000);
+    scheduleSegment(ctx as unknown as BaseAudioContext, {} as AudioNode, buffer, clip, segmentOf(clip, 250), 0);
+    const [source] = ctx.sources;
+    expect(ctx.createdBuffers).toHaveLength(1);
+    expect(ctx.createdBuffers[0]?.length).toBe(1000);
+    expect(source?.buffer).not.toBe(buffer);
+    expect(source?.playbackRate.value).toBe(1);
+    // A mídia de 500 ms (250 ms x 2) cai em 250 ms do buffer esticado.
+    expect(source?.started?.offset).toBeCloseTo(0.25, 9);
+  });
+
+  it('velocidade por curva automatiza a taxa ao longo do trecho, sem esticar o buffer', () => {
+    const clip = makeClip({
+      id: 'n3',
+      trackId: 't1',
+      durationMs: 1000,
+      speed: {
+        mode: 'curve',
+        value: 1,
+        preservePitch: true,
+        curve: [
+          { t: 0, speed: 1 },
+          { t: 1, speed: 3 },
+        ],
+      },
+    });
+    const ctx = new FakeNodeContext();
+    scheduleSegment(
+      ctx as unknown as BaseAudioContext,
+      {} as AudioNode,
+      sourceBuffer(2000, 1000),
+      clip,
+      segmentOf(clip),
+      0,
+    );
+    const [source] = ctx.sources;
+    expect(ctx.createdBuffers).toHaveLength(0);
+    const call = source?.playbackRate.curveCalls[0];
+    expect(call?.duration).toBe(1);
+    expect(call?.when).toBe(0);
+    expect(call?.values[0]).toBeCloseTo(1, 6);
+    expect(call?.values[call.values.length - 1]).toBeCloseTo(3, 6);
+    expect(source?.started?.offset).toBe(0);
+  });
+
+  it('velocidade fora de 0,0625x a 16x deixa o clipe mudo, em constante e em curva', () => {
+    const fast = makeClip({
+      id: 'm1',
+      trackId: 't1',
+      speed: { mode: 'constant', value: 20, curve: [], preservePitch: false },
+    });
+    const slow = makeClip({
+      id: 'm2',
+      trackId: 't1',
+      speed: {
+        mode: 'curve',
+        value: 1,
+        preservePitch: false,
+        curve: [
+          { t: 0, speed: 1 },
+          { t: 1, speed: 40 },
+        ],
+      },
+    });
+    const ctx = new FakeNodeContext();
+    const buffer = sourceBuffer(2000, 1000);
+    expect(scheduleSegment(ctx as unknown as BaseAudioContext, {} as AudioNode, buffer, fast, segmentOf(fast), 0)).toBeNull();
+    expect(scheduleSegment(ctx as unknown as BaseAudioContext, {} as AudioNode, buffer, slow, segmentOf(slow), 0)).toBeNull();
+    expect(ctx.sources).toHaveLength(0);
+  });
+
+  it('a mixagem offline não cria fonte para clipe fora da faixa do Web Audio', async () => {
+    const clip = makeClip({
+      id: 'm3',
+      trackId: 't1',
+      speed: { mode: 'constant', value: 0.01, curve: [], preservePitch: false },
+    });
+    const project = makeProject([makeTrack({ id: 't1', kind: 'audio', clips: [clip] })], [makeAsset('a1', 'audio')]);
+    await mixProjectAudio(project, 0, 1000, { sampleRate: 1000 });
+    expect(FakeOfflineAudioContext.last?.sources).toHaveLength(0);
+  });
+});
+
+describe('volume por keyframe na mixagem offline', () => {
+  it('automatiza o ganho nos instantes dos keyframes, com a interpolação entre eles', async () => {
+    const clip = makeClip({
+      id: 'vk',
+      trackId: 't1',
+      startMs: 0,
+      durationMs: 1000,
+      volume: 1,
+      keyframes: {
+        volume: [
+          { timeMs: 0, value: 0.5, easing: 'linear' },
+          { timeMs: 500, value: 1, easing: 'linear' },
+          { timeMs: 1000, value: 1.5, easing: 'linear' },
+        ],
+      },
+    });
+    const project = makeProject([makeTrack({ id: 't1', kind: 'audio', clips: [clip] })], [makeAsset('a1', 'audio')]);
+    await mixProjectAudio(project, 0, 1000, { sampleRate: 1000 });
+    expect(FakeOfflineAudioContext.last?.envelopeCalls).toEqual([
+      { op: 'setValueAtTime', value: 0.5, when: 0 },
+      { op: 'linearRampToValueAtTime', value: 1, when: 0.5 },
+      { op: 'linearRampToValueAtTime', value: 1.5, when: 1 },
+    ]);
   });
 });
