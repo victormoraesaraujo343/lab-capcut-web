@@ -5,6 +5,7 @@ import type { MixedAudio, ResolvedExport } from '../../types/export';
 import type { Project } from '../../types/project';
 import type { Compositor, FrameProvider } from '../../types/render';
 import { createPreviewFrameProvider } from '../decode/previewFrameProvider';
+import { ensureProjectFonts } from '../text/fontLoader';
 import { createCompositor } from '../render/compositor';
 import { renderFrame } from '../render/renderFrame';
 import { encodeWav } from './wavEncoder';
@@ -47,6 +48,8 @@ export async function exportVideoWithFfmpeg(
 
   signal.addEventListener('abort', onAbort, { once: true });
   try {
+    // Sem WebCodecs também é preciso carregar as fontes dos textos antes de desenhar.
+    await ensureProjectFonts(project, document.baseURI);
     if (audio) {
       await ffmpeg.writeFile(AUDIO_INPUT, new Uint8Array(encodeWav(audio)));
       written.push(AUDIO_INPUT);

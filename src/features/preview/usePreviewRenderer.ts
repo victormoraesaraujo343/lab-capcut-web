@@ -1,6 +1,7 @@
 // Renderizador da prévia: desenha o projeto no canvas WebGL, coalescendo pedidos e sem re-renderizar o React a cada quadro.
 import { useEffect, useState, type RefObject } from 'react';
 import { createCompositor } from '@/engine/render/compositor';
+import { ensureProjectFonts } from '@/engine/text/fontLoader';
 import { prefetchAround, renderFrame } from '@/engine/render/renderFrame';
 import { applyPreviewOverride, usePlaybackStore, usePreviewOverrideStore, useProjectStore } from '@/stores';
 import type { Compositor, Project } from '@/types';
@@ -96,6 +97,14 @@ export function usePreviewRenderer(canvasRef: RefObject<HTMLCanvasElement | null
       });
     }
 
+    /** Carrega as fontes do projeto e, quando chegarem, pede novo render para o texto sair na fonte certa. */
+    function loadFontsAndRender(project: Project | null): void {
+      if (project === null) return;
+      void ensureProjectFonts(project, document.baseURI).then(() => {
+        if (!cancelled) markChanged();
+      });
+    }
+
     /** Registra uma mudança: pede render agora em qualidade de prévia e, depois de um tempo parado, o final exato. */
     function markChanged(): void {
       settled = false;
@@ -128,7 +137,10 @@ export function usePreviewRenderer(canvasRef: RefObject<HTMLCanvasElement | null
       );
       unsubscribes.push(
         useProjectStore.subscribe((state, prev) => {
-          if (state.project !== prev.project) markChanged();
+          if (state.project !== prev.project) {
+            markChanged();
+            loadFontsAndRender(state.project);
+          }
         }),
       );
       unsubscribes.push(
@@ -140,6 +152,7 @@ export function usePreviewRenderer(canvasRef: RefObject<HTMLCanvasElement | null
         observer = new ResizeObserver(() => markChanged());
         observer.observe(element);
       }
+      loadFontsAndRender(useProjectStore.getState().project);
       markChanged();
     });
 

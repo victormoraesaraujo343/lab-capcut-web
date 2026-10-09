@@ -59,7 +59,15 @@ export interface MixedAudio {
 
 /** Mensagem da thread principal para o worker de exportação. */
 export type ExportRequest =
-  | { type: 'start'; jobId: number; project: Project; config: ResolvedExport; audio: MixedAudio | null }
+  | {
+      type: 'start';
+      jobId: number;
+      project: Project;
+      config: ResolvedExport;
+      audio: MixedAudio | null;
+      /** URL base do app (document.baseURI), para o worker achar public/fonts e carregar as fontes do projeto. */
+      assetBaseUrl: string;
+    }
   | { type: 'cancel'; jobId: number };
 
 /** Fases da exportação mostradas na barra de progresso. */

@@ -32,7 +32,7 @@ scope.onmessage = (event: MessageEvent<ExportRequest>) => {
   }
   activeJob = jobId;
   void runExportJob(
-    { project: request.project, config: request.config, audio: request.audio },
+    { project: request.project, config: request.config, audio: request.audio, assetBaseUrl: request.assetBaseUrl },
     post,
     () => cancelled.has(jobId),
     jobId,

@@ -8,6 +8,8 @@ import { usePreviewOverrideStore } from '@/stores/previewOverrideStore';
 import { useProjectStore } from '@/stores/projectStore';
 import { useTimelineStore } from '@/stores/timelineStore';
 import { setClipTransform } from '@/stores/timelineCommands';
+import { updateText } from '@/stores/textCommands';
+import { defaultTextStyle } from '@/engine/text/defaultTextStyle';
 import {
   defaultAudioFx,
   defaultSpeed,
@@ -22,6 +24,43 @@ vi.mock('@/stores/timelineCommands', () => ({
   setClipTransform: vi.fn(),
   selectClip: vi.fn(),
 }));
+
+vi.mock('@/stores/textCommands', () => ({
+  updateText: vi.fn(),
+}));
+
+vi.mock('@/engine/text/textRasterizer', () => ({
+  createTextRasterizer: () => ({
+    measure: () => ({ width: 400, height: 100 }),
+    rasterize: () => {
+      throw new Error('não usado nos testes da caixa');
+    },
+    dispose: () => undefined,
+  }),
+}));
+
+/** Projeto de teste 1920x1080 com um clipe de texto (t1) numa trilha de texto. */
+function makeTextProject(): Project {
+  const clip: Clip = {
+    id: 't1',
+    trackId: 'tr1',
+    startMs: 0,
+    durationMs: 5000,
+    trimInMs: 0,
+    trimOutMs: 0,
+    transform: defaultTransform(),
+    speed: defaultSpeed(),
+    volume: 1,
+    keyframes: {},
+    filters: [],
+    effects: [],
+    audio: defaultAudioFx(),
+    reversed: false,
+    text: { content: 'Oi', style: defaultTextStyle() },
+  };
+  const track: Track = { id: 'tr1', kind: 'text', name: 'Texto', clips: [clip], muted: false, locked: false, hidden: false };
+  return { ...makeProject(), tracks: [track], assets: [] };
+}
 
 /** Projeto de teste 1920x1080 com um clipe de imagem (c1) numa trilha, travada ou não. */
 function makeProject(locked = false): Project {
@@ -115,6 +154,10 @@ afterEach(() => {
   usePlaybackStore.setState({ currentTimeMs: 0, isPlaying: false });
 });
 
+afterEach(() => {
+  vi.mocked(updateText).mockClear();
+});
+
 describe('TransformOverlay', () => {
   it('com clipe selecionado mostra 4 alças de canto e a de giro', () => {
     setup();
@@ -175,5 +218,58 @@ describe('TransformOverlay', () => {
     fireEvent.pointerMove(stage, { clientX: 260, clientY: 112, pointerId: 1 });
     fireEvent.pointerUp(stage, { clientX: 260, clientY: 112, pointerId: 1 });
     expect(usePreviewOverrideStore.getState().clipId).toBeNull();
+  });
+
+  it('com clipe de texto selecionado desenha a caixa com área maior que zero e 4 alças', () => {
+    useProjectStore.setState({ project: makeTextProject() });
+    usePlaybackStore.setState({ currentTimeMs: 0, isPlaying: false });
+    useTimelineStore.setState({ selectedClipIds: ['t1'] });
+    render(<TransformOverlay />);
+    const points = document.querySelector('polygon')?.getAttribute('points') ?? '';
+    const xs = points.split(' ').map((pair) => Number(pair.split(',')[0]));
+    expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(50);
+    expect(screen.getAllByRole('button', { name: t.preview.resize })).toHaveLength(4);
+  });
+
+  it('duplo clique num texto abre o editor sobre a prévia e esconde a caixa', () => {
+    useProjectStore.setState({ project: makeTextProject() });
+    usePlaybackStore.setState({ currentTimeMs: 0, isPlaying: false });
+    useTimelineStore.setState({ selectedClipIds: ['t1'] });
+    const { container } = render(<TransformOverlay />);
+    const stage = container.querySelector('[tabindex="0"]');
+    if (!(stage instanceof HTMLElement)) throw new Error('Prévia não renderizou');
+    fireEvent.doubleClick(stage, { clientX: 200, clientY: 112 });
+    expect(screen.getByRole('textbox', { name: t.text.content })).toHaveValue('Oi');
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
+    expect(document.querySelector('polygon')).toBeNull();
+  });
+
+  it('digitar no editor chama updateText com o novo texto', () => {
+    useProjectStore.setState({ project: makeTextProject() });
+    useTimelineStore.setState({ selectedClipIds: ['t1'] });
+    const { container } = render(<TransformOverlay />);
+    const stage = container.querySelector('[tabindex="0"]');
+    if (!(stage instanceof HTMLElement)) throw new Error('Prévia não renderizou');
+    fireEvent.doubleClick(stage, { clientX: 200, clientY: 112 });
+    fireEvent.change(screen.getByRole('textbox', { name: t.text.content }), { target: { value: 'Olá' } });
+    expect(updateText).toHaveBeenCalledWith('t1', { content: 'Olá' });
+  });
+
+  it('Esc fecha o editor de texto', () => {
+    useProjectStore.setState({ project: makeTextProject() });
+    useTimelineStore.setState({ selectedClipIds: ['t1'] });
+    const { container } = render(<TransformOverlay />);
+    const stage = container.querySelector('[tabindex="0"]');
+    if (!(stage instanceof HTMLElement)) throw new Error('Prévia não renderizou');
+    fireEvent.doubleClick(stage, { clientX: 200, clientY: 112 });
+    fireEvent.keyDown(screen.getByRole('textbox', { name: t.text.content }), { key: 'Escape' });
+    expect(screen.queryByRole('textbox', { name: t.text.content })).toBeNull();
+    expect(screen.getAllByRole('button', { name: t.preview.resize })).toHaveLength(4);
+  });
+
+  it('duplo clique em mídia não abre editor de texto', () => {
+    const stage = setup();
+    fireEvent.doubleClick(stage, { clientX: 200, clientY: 112 });
+    expect(screen.queryByRole('textbox')).toBeNull();
   });
 });

@@ -122,6 +122,7 @@ describe('startExport', () => {
     expect(worker).toBeDefined();
     const [message, transfer] = worker?.postMessage.mock.calls[0] ?? [];
     expect(message).toMatchObject({ type: 'start', jobId: 1 });
+    expect(message).toMatchObject({ assetBaseUrl: document.baseURI });
     expect(transfer).toEqual(mix.channels.map((channel) => channel.buffer));
     worker?.emit({ type: 'done', jobId: 1, data: new ArrayBuffer(4), mimeType: 'video/mp4', fileName: 'saida.mp4' });
     const { blob, fileName } = await handle.result;

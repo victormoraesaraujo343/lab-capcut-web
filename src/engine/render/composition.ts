@@ -1,8 +1,9 @@
 // Composição pura: quais camadas aparecem num instante, com tempo de mídia, keyframes e transformação avaliada.
 
-import type { Asset, Clip, Layer, Project, Track } from '@/types';
+import type { Asset, Clip, Layer, Project, TextData, Track, Transform } from '@/types';
 import { clipEndMs } from '@/types';
 import { evaluateTransform } from './keyframes';
+import { evaluateTextAnimation, type TextAnimState } from '../text/textAnimations';
 
 /** Clipe com som ativo no instante, com o tempo de mídia a tocar. */
 export interface ActiveAudioClip {
@@ -67,6 +68,19 @@ function visualKindOf(clip: Clip, asset: Asset | undefined): Layer['kind'] | nul
   return null;
 }
 
+/** Transformação de um texto: a avaliada pelos keyframes, com a animação somada (deslocamento, escala, rotação, opacidade). */
+function textTransform(base: Transform, data: TextData, anim: TextAnimState): Transform {
+  return {
+    ...base,
+    x: base.x + anim.dx,
+    y: base.y + anim.dy,
+    scaleX: base.scaleX * anim.scale,
+    scaleY: base.scaleY * anim.scale,
+    rotation: base.rotation + anim.rotation,
+    opacity: base.opacity * anim.opacity * data.style.opacity,
+  };
+}
+
 /** Monta a camada de um clipe no instante, ou null se o clipe não aparece nele. */
 function resolveClipLayer(
   project: Project,
@@ -80,19 +94,36 @@ function resolveClipLayer(
   const asset = clipAsset(assets, clip);
   const kind = visualKindOf(clip, asset);
   if (kind === null) return null;
-  return {
+  const base = evaluateTransform(clip.transform, clip.keyframes, localTimeMs);
+  const common = {
     clipId: clip.id,
-    assetId: clip.assetId,
-    kind,
     mediaTimeMs: clipMediaTime(clip, localTimeMs),
     localTimeMs,
-    transform: evaluateTransform(clip.transform, clip.keyframes, localTimeMs),
-    sourceWidth: asset?.width ?? project.width,
-    sourceHeight: asset?.height ?? project.height,
     filters: [...clip.filters],
     effects: [...clip.effects],
     zIndex,
     playbackRate: clipPlaybackRate(clip),
+  };
+  if (clip.text) {
+    const anim = evaluateTextAnimation(clip.text, localTimeMs, clip.durationMs, project.height);
+    return {
+      ...common,
+      kind: 'text',
+      transform: textTransform(base, clip.text, anim),
+      sourceWidth: 0,
+      sourceHeight: 0,
+      fit: 'none',
+      text: { data: clip.text, reveal: anim.reveal },
+    };
+  }
+  return {
+    ...common,
+    assetId: clip.assetId,
+    kind,
+    transform: base,
+    sourceWidth: asset?.width ?? project.width,
+    sourceHeight: asset?.height ?? project.height,
+    fit: 'contain',
   };
 }
 

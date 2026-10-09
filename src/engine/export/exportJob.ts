@@ -2,6 +2,7 @@
 import type { ExportErrorCode, ExportPhase, ExportResponse, MixedAudio, ResolvedExport } from '../../types/export';
 import type { Project } from '../../types/project';
 import type { FrameProvider } from '../../types/render';
+import { ensureProjectFonts } from '../text/fontLoader';
 import { encodeAudio } from './audioEncode';
 import { createExportFrameProvider } from './exportFrameProvider';
 import { exportGif } from './gifExport';
@@ -16,6 +17,8 @@ export interface ExportJobRequest {
   config: ResolvedExport;
   /** Áudio mixado, ou null quando o projeto não tem som. */
   audio: MixedAudio | null;
+  /** URL base do app, para achar public/fonts e carregar as fontes do projeto. */
+  assetBaseUrl: string;
 }
 
 /** Tipos de trilha que desenham algo na saída (mesmo critério da composição). */
@@ -108,6 +111,7 @@ export async function runExportJob(
       throw new ExportFailure('empty', 'empty');
     }
     post({ type: 'progress', jobId, phase: 'preparing', done: 0, total: 1 });
+    await ensureProjectFonts(project, request.assetBaseUrl);
     provider = createExportFrameProvider();
     if (isCancelled()) return cancelled();
 

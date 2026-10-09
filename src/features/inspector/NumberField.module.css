@@ -1,0 +1,77 @@
+/* Linha de campo numérico: rótulo, slider e valor, em uma faixa compacta. */
+
+.row {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr) 76px;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 26px;
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+}
+
+.label {
+  cursor: ew-resize;
+  user-select: none;
+  touch-action: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.slider {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.picker {
+  width: 100%;
+  height: 24px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.input {
+  width: 100%;
+  min-width: 0;
+  height: 24px;
+  padding: 0 var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-panel-alt);
+  color: var(--text);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.input::-webkit-outer-spin-button,
+.input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.input:focus-visible {
+  outline: 1px solid var(--focus-ring);
+  outline-offset: 0;
+}
+
+.unit {
+  flex-shrink: 0;
+  color: var(--text-faint);
+  font-size: var(--font-size-sm);
+}

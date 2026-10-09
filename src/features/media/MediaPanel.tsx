@@ -12,13 +12,25 @@ import { MediaCard, isAssetDrag } from './MediaCard';
 import { filterAssets } from './filterAssets';
 import styles from './MediaPanel.module.css';
 
+/** Linha que junta busca e botão de importar no modo embutido. */
+const EMBEDDED_ROW_STYLE = { display: 'flex', alignItems: 'center', gap: 'var(--space-2)' } as const;
+
+/** Campo de busca que ocupa o espaço restante da linha no modo embutido. */
+const EMBEDDED_SEARCH_STYLE = { flex: 1, minWidth: 0 } as const;
+
 /** Indica se um DataTransfer carrega arquivos vindos do sistema (e não um card arrastado do painel). */
 function carriesFiles(dataTransfer: DataTransfer): boolean {
   return !isAssetDrag(dataTransfer) && Array.from(dataTransfer.types).includes('Files');
 }
 
+/** Propriedades do painel de mídia. */
+export interface MediaPanelProps {
+  /** Sem a moldura do painel: só o conteúdo, com o botão de importar ao lado do campo de busca. */
+  embedded?: boolean;
+}
+
 /** Painel completo de mídia do projeto aberto; sem projeto, mostra só o cabeçalho com o botão de importar desabilitado. */
-export function MediaPanel() {
+export function MediaPanel({ embedded = false }: MediaPanelProps) {
   const project = useProjectStore((s) => s.project);
   const importProgress = useProjectStore((s) => s.importProgress);
   const importErrors = useProjectStore((s) => s.importErrors);
@@ -93,6 +105,88 @@ export function MediaPanel() {
     </button>
   );
 
+  const fileInput = (
+    <input
+      ref={inputRef}
+      type="file"
+      multiple
+      hidden
+      accept={ACCEPT_ATTRIBUTE}
+      onChange={handleFileInput}
+    />
+  );
+
+  const searchField = (
+    <div className={styles.search}>
+      <Search size={14} strokeWidth={1.75} aria-hidden="true" />
+      <input
+        type="search"
+        className={styles.searchInput}
+        placeholder={t.media.search}
+        aria-label={t.media.search}
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+      />
+    </div>
+  );
+
+  // Modo embutido: busca e botão de importar lado a lado, sem a moldura do painel.
+  const searchRow = embedded ? (
+    <div style={EMBEDDED_ROW_STYLE}>
+      <div style={EMBEDDED_SEARCH_STYLE}>{searchField}</div>
+      {importButton}
+    </div>
+  ) : (
+    searchField
+  );
+
+  const body = (
+    <>
+      {fileInput}
+
+      {project === null ? (
+        embedded ? <div className={styles.content}>{importButton}</div> : null
+      ) : (
+        <div className={styles.content}>
+          {searchRow}
+
+          <FolderBar
+            folders={project.folders}
+            activeFolderId={activeFolderId}
+            onSelect={setSelectedFolderId}
+            onCreate={createFolder}
+            onRename={renameFolder}
+            onDelete={deleteFolder}
+            onDropAsset={moveAssetToFolder}
+          />
+
+          <ImportStatus progress={importProgress} errors={importErrors} onDismiss={dismissImportError} />
+
+          {project.assets.length === 0 ? (
+            <div className={styles.empty}>
+              <Film size={32} strokeWidth={1.5} aria-hidden="true" />
+              <p className={styles.emptyText}>{t.media.empty}</p>
+            </div>
+          ) : visibleAssets.length === 0 ? (
+            <p className={styles.emptyText}>{t.media.noResults}</p>
+          ) : (
+            <ul className={styles.grid} aria-label={t.panels.media}>
+              {visibleAssets.map((asset) => (
+                <MediaCard
+                  key={asset.id}
+                  asset={asset}
+                  folders={project.folders}
+                  onMove={moveAssetToFolder}
+                  onRemove={removeAsset}
+                />
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </>
+  );
+
   return (
     <div
       className={styles.root}
@@ -100,65 +194,7 @@ export function MediaPanel() {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      <PanelShell title={t.panels.media} actions={importButton}>
-        <input
-          ref={inputRef}
-          type="file"
-          multiple
-          hidden
-          accept={ACCEPT_ATTRIBUTE}
-          onChange={handleFileInput}
-        />
-
-        {project === null ? null : (
-          <div className={styles.content}>
-            <div className={styles.search}>
-              <Search size={14} strokeWidth={1.75} aria-hidden="true" />
-              <input
-                type="search"
-                className={styles.searchInput}
-                placeholder={t.media.search}
-                aria-label={t.media.search}
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-              />
-            </div>
-
-            <FolderBar
-              folders={project.folders}
-              activeFolderId={activeFolderId}
-              onSelect={setSelectedFolderId}
-              onCreate={createFolder}
-              onRename={renameFolder}
-              onDelete={deleteFolder}
-              onDropAsset={moveAssetToFolder}
-            />
-
-            <ImportStatus progress={importProgress} errors={importErrors} onDismiss={dismissImportError} />
-
-            {project.assets.length === 0 ? (
-              <div className={styles.empty}>
-                <Film size={32} strokeWidth={1.5} aria-hidden="true" />
-                <p className={styles.emptyText}>{t.media.empty}</p>
-              </div>
-            ) : visibleAssets.length === 0 ? (
-              <p className={styles.emptyText}>{t.media.noResults}</p>
-            ) : (
-              <ul className={styles.grid} aria-label={t.panels.media}>
-                {visibleAssets.map((asset) => (
-                  <MediaCard
-                    key={asset.id}
-                    asset={asset}
-                    folders={project.folders}
-                    onMove={moveAssetToFolder}
-                    onRemove={removeAsset}
-                  />
-                ))}
-              </ul>
-            )}
-          </div>
-        )}
-      </PanelShell>
+      {embedded ? body : <PanelShell title={t.panels.media} actions={importButton}>{body}</PanelShell>}
 
       {filesDragging && project !== null ? (
         <div className={styles.dropOverlay}>

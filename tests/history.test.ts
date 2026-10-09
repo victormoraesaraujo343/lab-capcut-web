@@ -6,6 +6,7 @@ import {
   createHistory,
   diffTracks,
   pushEntry,
+  recordEntry,
   redo,
   undo,
 } from "@/engine/timeline/history";
@@ -176,5 +177,66 @@ describe("applyEntry e desfazer/refazer", () => {
     const pushed = pushEntry(undone.history, e2);
     expect(canRedo(pushed)).toBe(false);
     expect(pushed.future).toEqual([]);
+  });
+});
+
+describe("recordEntry (agrupamento)", () => {
+  /** Monta uma entrada com chave e instante, a partir de uma mudança de mute em 'a'. */
+  function step(from: Track[], to: Track[], at: number, key: string | undefined) {
+    const entry = diffTracks(from, to, "digitar");
+    if (entry === null) throw new Error("entrada esperada");
+    return { ...entry, at, coalesceKey: key };
+  }
+
+  it("10 edições seguidas com a mesma chave viram 1 passo e um undo volta ao original", () => {
+    const original = [makeTrack("a")];
+    let tracks = original;
+    let history = createHistory();
+    for (let i = 1; i <= 10; i += 1) {
+      const next = [{ ...tracks[0], name: `n${i}` }] as Track[];
+      history = recordEntry(history, step(tracks, next, i * 100, "text:x"));
+      tracks = next;
+    }
+    expect(history.past).toHaveLength(1);
+    const result = undo(history, tracks);
+    if (result === null) throw new Error("undo esperado");
+    expect(result.tracks).toEqual(original);
+    expect(canUndo(result.history)).toBe(false);
+  });
+
+  it("chave diferente cria um passo novo", () => {
+    const a = makeTrack("a");
+    const b = { ...a, muted: true };
+    const c = { ...a, muted: true, locked: true };
+    let history = recordEntry(createHistory(), step([a], [b], 0, "text:1"));
+    history = recordEntry(history, step([b], [c], 100, "text:2"));
+    expect(history.past).toHaveLength(2);
+  });
+
+  it("pausa maior que 1 s cria um passo novo", () => {
+    const a = makeTrack("a");
+    const b = { ...a, muted: true };
+    const c = { ...a, muted: true, locked: true };
+    let history = recordEntry(createHistory(), step([a], [b], 0, "text:1"));
+    history = recordEntry(history, step([b], [c], 1500, "text:1"));
+    expect(history.past).toHaveLength(2);
+  });
+
+  it("edição sem chave nunca se funde", () => {
+    const a = makeTrack("a");
+    const b = { ...a, muted: true };
+    const c = { ...a, muted: true, locked: true };
+    let history = recordEntry(createHistory(), step([a], [b], 0, undefined));
+    history = recordEntry(history, step([b], [c], 10, undefined));
+    expect(history.past).toHaveLength(2);
+  });
+
+  it("a entrada fundida mantém o before antigo e o after novo", () => {
+    const a = makeTrack("a");
+    const b = { ...a, muted: true };
+    const c = { ...a, muted: true, locked: true };
+    let history = recordEntry(createHistory(), step([a], [b], 0, "k"));
+    history = recordEntry(history, step([b], [c], 200, "k"));
+    expect(history.past[0]?.changes).toEqual([{ trackId: "a", before: a, after: c }]);
   });
 });

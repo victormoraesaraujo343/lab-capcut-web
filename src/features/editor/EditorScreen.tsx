@@ -1,14 +1,14 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { SlidersHorizontal, type LucideIcon } from 'lucide-react';
 import { t } from '../../i18n/pt-BR';
 import { runWithToast, useProjectStore, usePlaybackStore, useUiStore } from '../../stores';
 import { TopBar } from '../layout/TopBar';
 import { ExportDialog } from '../export/ExportDialog';
-import { PanelShell } from '../layout/PanelShell';
-import { MediaPanel } from '@/features/media/MediaPanel';
+import { InspectorPanel } from '@/features/inspector/InspectorPanel';
+import { LibraryPanel } from '@/features/library/LibraryPanel';
 import { TimelinePanel } from '@/features/timeline/TimelinePanel';
 import { PreviewPanel } from '@/features/preview/PreviewPanel';
 import { TransformOverlay } from '@/features/preview/TransformOverlay';
+import { disposeTranscriber } from '@/engine/captions/transcribeClient';
 import { ResizeHandle } from '../../components/ResizeHandle';
 import { HANDLE_SIZE, TOP_BAR_HEIGHT, computeEditorLayout } from './editorLayout';
 import styles from './EditorScreen.module.css';
@@ -19,16 +19,6 @@ type ResizableKey = 'mediaWidth' | 'inspectorWidth' | 'timelineHeight';
 function adjustPanel(key: ResizableKey, delta: number): void {
   const state = useUiStore.getState();
   state.setPanelSize(key, state.panelSizes[key] + delta);
-}
-
-/** Estado vazio centralizado com ícone e texto, usado nos painéis ainda sem conteúdo. */
-function EmptyState({ icon: Icon, text }: { icon: LucideIcon; text: string }) {
-  return (
-    <div className={styles.empty}>
-      <Icon size={48} strokeWidth={1.25} aria-hidden="true" className={styles.emptyIcon} />
-      <p className={styles.emptyText}>{text}</p>
-    </div>
-  );
 }
 
 /** Célula da grade do editor, posicionada pela classe e, se houver, pela coluna recebida. */
@@ -72,6 +62,9 @@ export function EditorScreen() {
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
+
+  // Ao sair do editor, encerra o worker de transcrição (libera a memória do modelo).
+  useEffect(() => () => disposeTranscriber(), []);
 
   const layout = computeEditorLayout(viewport.w, viewport.h, {
     mediaWidth,
@@ -128,7 +121,7 @@ export function EditorScreen() {
         {layout.showMedia && (
           <>
             <Cell className={styles.media} column={colOf('media')}>
-              <MediaPanel />
+              <LibraryPanel />
             </Cell>
 
             <Cell className={styles.handleMedia} column={colOf('handleMedia')}>
@@ -158,9 +151,7 @@ export function EditorScreen() {
             </Cell>
 
             <Cell className={styles.inspector} column={colOf('inspector')}>
-              <PanelShell title={t.panels.inspector}>
-                <EmptyState icon={SlidersHorizontal} text={t.inspector.empty} />
-              </PanelShell>
+              <InspectorPanel />
             </Cell>
           </>
         )}

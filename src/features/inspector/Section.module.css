@@ -1,0 +1,133 @@
+/* Seção recolhível do inspetor: cabeçalho em linha e corpo com espaçamento compacto. */
+
+.section {
+  border-bottom: 1px solid var(--border);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  height: 32px;
+  padding: 0 var(--space-3);
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.header:hover {
+  background: var(--bg-hover);
+}
+
+.header:focus-visible {
+  outline: 1px solid var(--focus-ring);
+  outline-offset: -1px;
+}
+
+.title {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3) var(--space-3);
+}
+
+/* Botão de ação compacto dentro de uma seção (ex.: redefinir, travar proporção). */
+.action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  height: 26px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-panel-alt);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.action:hover {
+  background: var(--bg-hover);
+}
+
+.action[aria-pressed='true'] {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.action:focus-visible {
+  outline: 1px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+/* Linha de botões de ação, alinhada à esquerda. */
+.actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+/* Campo de texto de múltiplas linhas e campos de busca do inspetor. */
+.textarea,
+.search {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-panel-alt);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--font-size-md);
+}
+
+.textarea {
+  resize: vertical;
+}
+
+.textarea:focus-visible,
+.search:focus-visible {
+  outline: 1px solid var(--focus-ring);
+  outline-offset: 0;
+}
+
+/* Pilha vertical de linhas dentro de uma seção (ex.: animações). */
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+/* Lista suspensa de escolha dentro de uma linha de campo. */
+.select {
+  width: 100%;
+  min-width: 0;
+  height: 26px;
+  padding: 0 var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-panel-alt);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--font-size-md);
+}
+
+.select:focus-visible {
+  outline: 1px solid var(--focus-ring);
+  outline-offset: 0;
+}

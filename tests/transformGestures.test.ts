@@ -1,5 +1,5 @@
 // Testes puros dos gestos da prévia: escala de exibição, mover, escala, giro, encaixe, escolha de camada e cursor.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   cornerCursor,
   hitTestLayers,
@@ -9,7 +9,18 @@ import {
   screenToProject,
   snapToCenter,
 } from '@/features/preview/transformGestures';
+import { measureLayers } from '@/features/preview/measuredLayers';
 import { defaultTransform, type Layer, type Transform } from '@/types';
+
+vi.mock('@/engine/text/textRasterizer', () => ({
+  createTextRasterizer: (): { measure: () => { width: number; height: number }; rasterize: () => never; dispose: () => void } => ({
+    measure: () => ({ width: 320, height: 120 }),
+    rasterize: (): never => {
+      throw new Error('não usado nos testes de medida');
+    },
+    dispose: (): void => undefined,
+  }),
+}));
 
 /** Cria uma camada de teste 1920x1080 com a transformação dada e o zIndex informado. */
 function makeLayer(clipId: string, zIndex: number, transform: Partial<Transform> = {}): Layer {
@@ -25,6 +36,7 @@ function makeLayer(clipId: string, zIndex: number, transform: Partial<Transform>
     effects: [],
     zIndex,
     playbackRate: 1,
+    fit: 'contain',
   };
 }
 
@@ -108,5 +120,54 @@ describe('cornerCursor', () => {
 
   it('inverte o cursor do canto quando o clipe gira 90 graus', () => {
     expect(cornerCursor(0, 90)).toBe('nesw-resize');
+  });
+});
+
+describe('measureLayers', () => {
+  it('preenche o tamanho de uma camada de texto com a medida do rasterizador', () => {
+    const textLayer: Layer = {
+      clipId: 't1',
+      kind: 'text',
+      mediaTimeMs: 0,
+      localTimeMs: 0,
+      transform: defaultTransform(),
+      sourceWidth: 0,
+      sourceHeight: 0,
+      filters: [],
+      effects: [],
+      zIndex: 0,
+      playbackRate: 0,
+      fit: 'none',
+      text: {
+        reveal: 1,
+        data: {
+          content: 'Oi',
+          style: {
+            fontFamily: 'Inter',
+            fontSize: 96,
+            color: '#fff',
+            bold: false,
+            italic: false,
+            underline: false,
+            align: 'center',
+            letterSpacing: 0,
+            lineHeight: 1.2,
+            strokeColor: '#000',
+            strokeWidth: 0,
+            shadowColor: '#000',
+            shadowBlur: 0,
+            shadowOffsetX: 0,
+            shadowOffsetY: 0,
+            backgroundColor: '#000',
+            backgroundOpacity: 0,
+            opacity: 1,
+          },
+        },
+      },
+    };
+    const [measured] = measureLayers([textLayer]);
+    expect(measured?.sourceWidth).toBe(320);
+    expect(measured?.sourceHeight).toBe(120);
+    expect(textLayer.sourceWidth).toBe(0);
   });
 });

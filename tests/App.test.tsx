@@ -49,7 +49,7 @@ describe('App', () => {
   it('com projeto aberto mostra os quatro painéis', () => {
     useProjectStore.setState({ project: createProject('Teste') });
     render(createElement(App));
-    expect(screen.getByText('Mídia')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Mídia/ })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: t.panels.preview })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: t.panels.inspector })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: t.panels.timeline })).toBeInTheDocument();

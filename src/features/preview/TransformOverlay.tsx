@@ -34,6 +34,9 @@ import {
   snapToCenter,
   type Point,
 } from './transformGestures';
+import { measureLayers } from './measuredLayers';
+import { InlineTextEditor } from './InlineTextEditor';
+import { useTextEditGesture } from './useTextEditGesture';
 import styles from './TransformOverlay.module.css';
 
 /** Tipo de gesto em andamento. */
@@ -86,7 +89,7 @@ const ARROW_STEPS: Readonly<Record<string, readonly [number, number]>> = {
 };
 
 /** Ponto do ponteiro em px do projeto, relativo à prévia. */
-function stagePoint(stage: HTMLDivElement | null, e: ReactPointerEvent<HTMLDivElement>, scale: number): Point {
+function stagePoint(stage: HTMLDivElement | null, e: { clientX: number; clientY: number }, scale: number): Point {
   const rect = stage?.getBoundingClientRect();
   return screenToProject(e.clientX - (rect?.left ?? 0), e.clientY - (rect?.top ?? 0), scale);
 }
@@ -123,19 +126,30 @@ export function TransformOverlay(): ReactElement {
   // Escala de exibição: largura mostrada da prévia dividida pela largura do projeto.
   const scale = project !== null && project.width > 0 ? stageWidth / project.width : 0;
 
-  // Camadas do instante já com o ajuste provisório do arrasto, para a caixa acompanhar o movimento.
+  // Camadas do instante já com o ajuste provisório do arrasto e com o tamanho do texto medido, para a caixa e o hit-test.
   const layers = useMemo(
     () =>
       project === null
         ? []
-        : resolveLayers(applyPreviewOverride(project, overrideClipId, overrideTransform), currentTimeMs),
+        : measureLayers(
+            resolveLayers(applyPreviewOverride(project, overrideClipId, overrideTransform), currentTimeMs),
+          ),
     [project, overrideClipId, overrideTransform, currentTimeMs],
   );
+  const { editingClipId, closeEditor, onDoubleClick } = useTextEditGesture({
+    project,
+    layers,
+    scale,
+    isPlaying,
+    stageRef,
+    pointOf: stagePoint,
+  });
   const layer = pickSelectedLayer(layers, selectedIds);
   const quadProject = project !== null && layer !== undefined ? projectQuad(layer, project) : null;
   const locked = project !== null && layer !== undefined && isClipLocked(project, layer.clipId);
   const screen = quadProject !== null && scale > 0 ? scaleQuad(quadProject, scale) : null;
-  const showHandles = screen !== null && !locked && !isPlaying;
+  const editing = editingClipId !== null;
+  const showHandles = screen !== null && !locked && !isPlaying && !editing;
 
   // Acompanha a largura exibida do próprio elemento.
   useEffect(() => {
@@ -235,6 +249,7 @@ export function TransformOverlay(): ReactElement {
   const topMid: Point | null = screen === null ? null : [(screen[0][0] + screen[1][0]) / 2, (screen[0][1] + screen[1][1]) / 2];
 
   return (
+    <>
     <div
       ref={stageRef}
       className={styles.overlay}
@@ -244,10 +259,11 @@ export function TransformOverlay(): ReactElement {
       onPointerUp={() => endGesture(true)}
       onPointerCancel={() => endGesture(false)}
       onKeyDown={onKeyDown}
+      onDoubleClick={onDoubleClick}
     >
       {guides.x && <div className={styles.guideVertical} />}
       {guides.y && <div className={styles.guideHorizontal} />}
-      {screen !== null && (
+      {screen !== null && !editing && (
         <svg className={styles.svg} aria-hidden="true">
           <polygon
             className={locked ? styles.outlineLocked : styles.outline}
@@ -286,5 +302,7 @@ export function TransformOverlay(): ReactElement {
         </div>
       )}
     </div>
+    {editingClipId !== null && <InlineTextEditor clipId={editingClipId} onClose={closeEditor} />}
+    </>
   );
 }

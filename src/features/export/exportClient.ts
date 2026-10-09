@@ -150,7 +150,14 @@ async function encodeInWorker(
     const fail = (): void => reject(new Error(estimateSizeBytes(config) > LARGE_FILE_BYTES ? 'memory' : 'generic'));
     worker.onerror = fail;
     worker.onmessageerror = fail;
-    const request: ExportRequest = { type: 'start', jobId: JOB_ID, project, config, audio };
+    const request: ExportRequest = {
+      type: 'start',
+      jobId: JOB_ID,
+      project,
+      config,
+      audio,
+      assetBaseUrl: document.baseURI,
+    };
     const transfer = audio ? audio.channels.map((channel) => channel.buffer as ArrayBuffer) : [];
     worker.postMessage(request, transfer);
   });

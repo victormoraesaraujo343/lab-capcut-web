@@ -24,6 +24,7 @@ function makeLayer(transform: Partial<Transform> = {}): Layer {
     effects: [],
     zIndex: 0,
     playbackRate: 1,
+    fit: 'contain',
   };
 }
 
@@ -95,6 +96,17 @@ describe('layerMatrix', () => {
     const [cx, cy] = transformPoint3(m, 0, 0);
     expect(cx).toBeCloseTo(0);
     expect(cy).toBeCloseTo(0);
+  });
+});
+
+describe('fit none', () => {
+  it('usa o tamanho natural da camada, sem encaixar no quadro', () => {
+    const layer: Layer = { ...makeLayer(), sourceWidth: 300, sourceHeight: 100, fit: 'none' };
+    const corners = layerCorners(layer, 1080, 1920);
+    expectCorner(corners[0] ?? [0, 0], [390, 910]);
+    expectCorner(corners[1] ?? [0, 0], [690, 910]);
+    expectCorner(corners[2] ?? [0, 0], [690, 1010]);
+    expectCorner(corners[3] ?? [0, 0], [390, 1010]);
   });
 });
 

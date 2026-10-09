@@ -9,8 +9,8 @@ Orquestrador: Opus 5.5. Agentes: Haiku (tarefas), Sonnet (revisor).
 | 3 | Linha do tempo | ✅ passou |
 | 4 | Prévia e reprodução | ✅ passou |
 | 5 | Exportar | ✅ passou |
-| 6 | Texto | em andamento |
-| 7 | Transições, filtros, efeitos, velocidade | pendente |
+| 6 | Texto | ✅ passou |
+| 7 | Transições, filtros, efeitos, velocidade | em andamento |
 | 8 | Áudio | pendente |
 | 9 | Stickers, formas, sobreposições | pendente |
 | 10 | Polimento e Pro liberado | pendente |
@@ -55,3 +55,9 @@ Orquestrador: Opus 5.5. Agentes: Haiku (tarefas), Sonnet (revisor).
 - VP9 perfil 1 (4:4:4) sem CodecPrivate: perfil lido do cabeçalho do 1º quadro-chave.
 - Etapa 5 passou (revisor: PASSA). Menores corrigidos: corrida no cancelamento, reserva ffmpeg também para codec sem suporte, altura par no modo compatível, foco no diálogo, aviso de arquivo >1,5 GB.
 - Etapa 6 preparada: 12 fontes livres copiadas do sistema para public/fonts (fonts.json + LICENCAS.md, 8 MB); vídeo de teste com fala sintética (tests/fixtures/media/fala-1min.mp4, voz flite em inglês).
+- Etapa 6: decisão de biblioteca — o plano cita `@xenova/transformers`, mas ela está abandonada (2024) e trazia 5 alertas de segurança (1 crítico). Usado o sucessor oficial dos mesmos autores, `@huggingface/transformers@4.3.0` (0 alertas). Runtime ONNX servido de public/ort (scripts/copy-vendor.mjs). Modelo Whisper baixado do Hugging Face só na 1ª vez que pedem legendas e guardado no cache do navegador.
+- Contrato etapa 6 (orquestrador): `Layer.fit` ('contain' | 'none'), `Layer.text`, `TextRasterizer` em types/render.ts; `ExportRequest.assetBaseUrl` (worker acha public/fonts).
+- Etapa 6 passou (revisor rodada 2: PASSA; 840 testes). Critério feito pela interface: aba Legendas → 21 legendas em 6 s (Whisper tiny, modelo em cache), corrigida "previous"→"preview is" na lista (1 passo no histórico), estilo "Caixa preta" no inspetor, exportado MP4 com as legendas gravadas (conferido no quadro exportado).
+- Corrigidos na etapa: topo das letras cortado (métricas ascendente/descendente), fonte reserva presa no cache (fontEpoch), opacidade dupla, legenda fora do quadro em 9:16 (TextData.maxWidth + quebra por palavra; fonte = 6% do menor lado), trilha de legendas marcada por `role: 'captions'`.
+- Menores abertos: caixa de seleção pode usar medida da fonte reserva até a próxima mudança; editor inline não quebra linha igual ao desenho; maxWidth não se ajusta ao trocar o formato do projeto depois.
+- Lição: depois de editar arquivos com o servidor de dev ligado, dados criados nessa sessão podem vir do código velho → reiniciar o servidor ANTES de criar dados de teste.

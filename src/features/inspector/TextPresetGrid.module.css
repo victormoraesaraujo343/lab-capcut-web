@@ -1,0 +1,41 @@
+/* Grade de miniaturas dos estilos prontos de texto: quatro colunas quadradas. */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-1);
+}
+
+.tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1 / 1;
+  min-width: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-panel-alt);
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.tile:hover {
+  border-color: var(--accent);
+}
+
+.tile:focus-visible {
+  outline: 1px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.sample {
+  display: inline-block;
+  max-width: 100%;
+  padding: 2px 4px;
+  font-size: 22px;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
+}

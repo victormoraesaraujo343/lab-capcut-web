@@ -135,6 +135,8 @@ export interface TextData {
   content: string;
   /** Estilo visual do texto. */
   style: TextStyle;
+  /** Largura máxima da caixa em px do projeto: linhas mais largas quebram em palavras. Ausente = só quebra em '\n'. */
+  maxWidth?: number;
   /** Animação ao entrar. */
   animationIn?: TextAnimation;
   /** Animação ao sair. */
@@ -221,6 +223,8 @@ export interface Track {
   kind: TrackKind;
   /** Nome exibido da trilha. */
   name: string;
+  /** Papel especial da trilha: 'captions' = legendas automáticas (identifica a trilha mesmo se for renomeada). */
+  role?: 'captions';
   /** Clipes da trilha. */
   clips: Clip[];
   /** Trilha silenciada. */

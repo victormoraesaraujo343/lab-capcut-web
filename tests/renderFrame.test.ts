@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { prefetchAround, renderFrame } from '../src/engine/render/renderFrame';
 import { resolveLayers } from '../src/engine/render/composition';
-import { defaultTransform, type Asset, type Project } from '../src/types/project';
-import type { CompositeOptions, Compositor, FrameImage, FrameProvider, Layer } from '../src/types/render';
+import { defaultTransform, type Asset, type Project, type TextData } from '../src/types/project';
+import type { CompositeOptions, Compositor, FrameImage, FrameProvider, Layer, TextRasterizer } from '../src/types/render';
 
 vi.mock('../src/engine/render/composition', () => ({
   resolveLayers: vi.fn(),
@@ -37,6 +37,7 @@ function makeLayer(clipId: string, assetId: string | undefined, zIndex: number):
     effects: [],
     zIndex,
     playbackRate: 1,
+    fit: 'contain',
   };
 }
 
@@ -230,5 +231,51 @@ describe('renderFrame', () => {
     prefetchAround(makeProject([makeAsset('a1')]), 0, provider, -1);
 
     expect(provider.prefetched).toEqual([{ assetId: 'a1', mediaTimeMs: 1000, direction: -1 }]);
+  });
+  it('rasteriza a camada de texto, usa o tamanho da imagem e não a libera no provider', async () => {
+    const data = { content: 'oi' } as unknown as TextData;
+    const textLayer: Layer = {
+      ...makeLayer('t1', undefined, 0),
+      kind: 'text',
+      fit: 'none',
+      sourceWidth: 0,
+      sourceHeight: 0,
+      text: { data, reveal: 0.5 },
+    };
+    resolveLayersMock.mockReturnValue([textLayer]);
+    const image = document.createElement('canvas');
+    image.width = 320;
+    image.height = 80;
+    const rasterizer: TextRasterizer = {
+      rasterize: vi.fn(() => image),
+      measure: vi.fn(() => ({ width: 320, height: 80 })),
+      dispose: vi.fn(),
+    };
+    const provider = makeProvider(new Map());
+    const compositor = makeCompositor();
+
+    const drawn = await renderFrame(compositor, makeProject([]), 0, provider, { scale: 1, exact: true }, rasterizer);
+
+    expect(rasterizer.rasterize).toHaveBeenCalledWith(data, 0.5);
+    expect(drawn).toHaveLength(1);
+    expect(drawn[0]).toMatchObject({ clipId: 't1', sourceWidth: 320, sourceHeight: 80 });
+    expect(compositor.calls[0]?.keys).toEqual(['t1']);
+    expect(provider.released).toEqual([]);
+  });
+
+  it('desenha o texto na ordem de zIndex junto com os quadros de vídeo', async () => {
+    const data = { content: 'oi' } as unknown as TextData;
+    const text: Layer = { ...makeLayer('t1', undefined, 1), kind: 'text', fit: 'none', text: { data, reveal: 1 } };
+    resolveLayersMock.mockReturnValue([makeLayer('c1', 'a1', 0), text]);
+    const image = document.createElement('canvas');
+    const rasterizer: TextRasterizer = { rasterize: () => image, measure: () => ({ width: 1, height: 1 }), dispose: () => undefined };
+    const frame = document.createElement('canvas');
+    const provider = makeProvider(new Map<string, FrameImage | null>([['a1', frame]]));
+    const compositor = makeCompositor();
+
+    await renderFrame(compositor, makeProject([makeAsset('a1')]), 0, provider, { scale: 1, exact: true }, rasterizer);
+
+    expect(compositor.calls[0]?.layers.map((layer) => layer.clipId)).toEqual(['c1', 't1']);
+    expect(provider.released).toEqual([frame]);
   });
 });

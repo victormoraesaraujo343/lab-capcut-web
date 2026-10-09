@@ -4,7 +4,7 @@ import type { Track } from '@/types';
 import {
   createHistory,
   diffTracks,
-  pushEntry,
+  recordEntry,
   redo as redoHistory,
   undo as undoHistory,
   type HistoryState,
@@ -55,8 +55,13 @@ export interface TimelineState {
   setTool: (tool: TimelineTool) => void;
   /** Guarda o conteúdo copiado. */
   setClipboard: (data: ClipboardData | null) => void;
-  /** Aplica uma edição às trilhas do projeto, registra no histórico e opcionalmente muda a seleção. */
-  edit: (label: string, fn: (tracks: Track[]) => Track[], nextSelection?: string[]) => void;
+  /** Aplica uma edição às trilhas do projeto, registra no histórico e opcionalmente muda a seleção. Com coalesceKey, edições seguidas com a mesma chave se fundem num passo só. */
+  edit: (
+    label: string,
+    fn: (tracks: Track[]) => Track[],
+    nextSelection?: string[],
+    options?: { coalesceKey?: string },
+  ) => void;
   /** Desfaz a última edição. */
   undo: () => void;
   /** Refaz a edição desfeita mais recente. */
@@ -103,14 +108,15 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
   // Guarda o conteúdo copiado.
   setClipboard: (data) => set({ clipboard: data }),
   // Aplica uma edição: sem mudança não entra no histórico.
-  edit: (label, fn, nextSelection) => {
+  edit: (label, fn, nextSelection, options) => {
     const project = useProjectStore.getState().project;
     if (project === null) return;
     const before = project.tracks;
     const after = fn(before);
     const entry = diffTracks(before, after, label);
     if (entry === null) return;
-    set({ history: pushEntry(get().history, entry) });
+    const stamped = { ...entry, at: Date.now(), coalesceKey: options?.coalesceKey };
+    set({ history: recordEntry(get().history, stamped) });
     useProjectStore.getState().setTracks(after);
     if (nextSelection) get().selectClips(nextSelection);
   },

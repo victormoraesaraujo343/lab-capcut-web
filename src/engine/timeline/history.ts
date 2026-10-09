@@ -22,7 +22,14 @@ export interface HistoryEntry {
   orderBefore: string[];
   /** Ordem dos ids de trilha depois da ação. */
   orderAfter: string[];
+  /** Instante (ms) da última edição que compôs esta entrada. */
+  at?: number;
+  /** Chave de agrupamento: edições seguidas com a mesma chave viram um passo só. */
+  coalesceKey?: string;
 }
+
+/** Janela máxima, em ms, entre duas edições com a mesma chave para elas se fundirem. */
+export const COALESCE_WINDOW_MS = 1000;
 
 /** Pilhas de ações: passado (para desfazer) e futuro (para refazer). */
 export interface HistoryState {
@@ -114,6 +121,51 @@ export function applyEntry(
 /** Registra uma nova ação no passado e descarta o futuro. */
 export function pushEntry(h: HistoryState, e: HistoryEntry): HistoryState {
   return { past: [...h.past, e], future: [] };
+}
+
+/** Funde uma edição posterior numa entrada anterior: mantém before e ordem antigos e usa o after novo. */
+export function mergeEntries(prev: HistoryEntry, next: HistoryEntry): HistoryEntry {
+  const changes = new Map<string, TrackPatch>();
+  for (const change of prev.changes) {
+    changes.set(change.trackId, change);
+  }
+  for (const change of next.changes) {
+    const earlier = changes.get(change.trackId);
+    changes.set(change.trackId, {
+      trackId: change.trackId,
+      before: earlier ? earlier.before : change.before,
+      after: change.after,
+    });
+  }
+  return {
+    label: prev.label,
+    changes: [...changes.values()],
+    orderBefore: prev.orderBefore,
+    orderAfter: next.orderAfter,
+    at: next.at,
+    coalesceKey: prev.coalesceKey,
+  };
+}
+
+/**
+ * Registra uma edição com agrupamento: se a última entrada tem a mesma chave, o futuro está vazio
+ * e a pausa desde a última edição é menor que COALESCE_WINDOW_MS, funde as duas; senão cria um passo novo.
+ */
+export function recordEntry(h: HistoryState, e: HistoryEntry): HistoryState {
+  const last = h.past[h.past.length - 1];
+  const canMerge =
+    e.coalesceKey !== undefined &&
+    last !== undefined &&
+    last.coalesceKey === e.coalesceKey &&
+    h.future.length === 0 &&
+    e.at !== undefined &&
+    last.at !== undefined &&
+    e.at - last.at < COALESCE_WINDOW_MS;
+  if (!canMerge) return pushEntry(h, e);
+  return {
+    past: [...h.past.slice(0, -1), mergeEntries(last, e)],
+    future: [],
+  };
 }
 
 /** Desfaz a última ação; retorna o histórico e as trilhas novas, ou null se não há o que desfazer. */

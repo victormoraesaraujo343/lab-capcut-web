@@ -13,3 +13,4 @@ export type { Toast, ToastKind, ToastState } from './toastStore';
 export type { TimelineTool } from './timelineStore';
 export * from './timelineCommands';
 export * from './previewOverrideStore';
+export * from './textCommands';

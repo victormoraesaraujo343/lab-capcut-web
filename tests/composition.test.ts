@@ -16,6 +16,7 @@ import {
   type Track,
   type TrackKind,
 } from '@/types';
+import { defaultTextStyle } from '@/engine/text/defaultTextStyle';
 
 /** Cria um clipe de teste de 1000 ms começando em 0, com os campos dados. */
 function makeClip(overrides: Partial<Clip> = {}): Clip {
@@ -239,5 +240,94 @@ describe('playbackRate da camada', () => {
     const clip = makeClip({ reversed: true, speed: { ...defaultSpeed(), value: 1.5 } });
     const layers = resolveLayers(makeProject([makeTrack('t1', 'video', [clip])], [makeAsset()]), 100);
     expect(layers[0]?.playbackRate).toBe(1.5);
+  });
+});
+
+/** Clipe de texto de teste de 1000 ms, sem asset, com o conteúdo e as animações dados. */
+function makeTextClip(overrides: Partial<Clip> = {}): Clip {
+  return makeClip({
+    id: 'txt',
+    assetId: undefined,
+    trackId: 'tx',
+    text: { content: 'oi', style: defaultTextStyle() },
+    ...overrides,
+  });
+}
+
+describe('camadas de texto', () => {
+  it('clipe de texto vira camada de texto sem asset, com fit none e tamanho a medir', () => {
+    const project = makeProject([makeTrack('tx', 'text', [makeTextClip()])], []);
+    const layers = resolveLayers(project, 100);
+    expect(layers).toHaveLength(1);
+    const layer = layers[0];
+    expect(layer?.kind).toBe('text');
+    expect(layer?.fit).toBe('none');
+    expect(layer?.assetId).toBeUndefined();
+    expect(layer?.sourceWidth).toBe(0);
+    expect(layer?.sourceHeight).toBe(0);
+    expect(layer?.text?.data.content).toBe('oi');
+    expect(layer?.text?.reveal).toBe(1);
+  });
+
+  it('aplica o fadeIn e o slideLeft do texto sobre a transformação do clipe', () => {
+    const textClip = makeTextClip({
+      transform: { ...defaultTransform(), x: 10 },
+      text: {
+        content: 'oi',
+        style: { ...defaultTextStyle(), opacity: 0.5 },
+        animationIn: { type: 'fadeIn', durationMs: 400 },
+      },
+    });
+    const project = makeProject([makeTrack('tx', 'text', [textClip])], []);
+    const start = resolveLayers(project, 0)[0];
+    expect(start?.transform.opacity).toBe(0);
+    const later = resolveLayers(project, 200)[0];
+    expect(later?.transform.opacity).toBeCloseTo(0.875 * 0.5);
+  });
+
+  it('aplica a opacidade do estilo uma vez só, na opacidade da camada', () => {
+    const textClip = makeTextClip({ text: { content: 'oi', style: { ...defaultTextStyle(), opacity: 0.5 } } });
+    const project = makeProject([makeTrack('tx', 'text', [textClip])], []);
+    expect(resolveLayers(project, 100)[0]?.transform.opacity).toBe(0.5);
+  });
+
+  it('slide do texto desloca x em 15% da altura do projeto', () => {
+    const textClip = makeTextClip({
+      transform: { ...defaultTransform(), x: 10 },
+      text: {
+        content: 'oi',
+        style: defaultTextStyle(),
+        animationIn: { type: 'slideLeft', durationMs: 400 },
+      },
+    });
+    const project = makeProject([makeTrack('tx', 'text', [textClip])], []);
+    const layer = resolveLayers(project, 0)[0];
+    expect(layer?.transform.x).toBeCloseTo(10 + 0.15 * 1920);
+    expect(layer?.transform.y).toBe(0);
+  });
+
+  it('digitação revela o texto no instante pela animação typewriter', () => {
+    const textClip = makeTextClip({
+      text: {
+        content: 'oi',
+        style: defaultTextStyle(),
+        animationIn: { type: 'typewriter', durationMs: 1000 },
+      },
+    });
+    const project = makeProject([makeTrack('tx', 'text', [textClip])], []);
+    expect(resolveLayers(project, 500)[0]?.text?.reveal).toBeCloseTo(0.5);
+  });
+
+  it('mídia continua com fit contain', () => {
+    const project = makeProject([makeTrack('v', 'video', [makeClip({ id: 'film' })])], [makeAsset()]);
+    expect(resolveLayers(project, 100)[0]?.fit).toBe('contain');
+  });
+
+  it('trilha de texto acima do vídeo desenha por cima dele', () => {
+    const video = makeTrack('v', 'video', [makeClip({ id: 'film' })]);
+    const text = makeTrack('tx', 'text', [makeTextClip()]);
+    const layers = resolveLayers(makeProject([text, video], [makeAsset()]), 500);
+    expect(layers.map((l) => l.clipId)).toEqual(['film', 'txt']);
+    expect(layers[1]?.zIndex).toBeGreaterThan(layers[0]?.zIndex ?? 0);
   });
 });

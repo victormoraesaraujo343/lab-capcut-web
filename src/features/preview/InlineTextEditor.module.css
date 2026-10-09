@@ -1,0 +1,28 @@
+/* Editor de texto sobre a prévia: camada transparente de tamanho da prévia e a textarea do texto por cima. */
+
+.wrap {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.area {
+  position: absolute;
+  display: block;
+  box-sizing: border-box;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  outline: 1px dashed var(--accent);
+  resize: none;
+  overflow: hidden;
+  white-space: pre;
+  pointer-events: auto;
+  transform-origin: 50% 50%;
+  caret-color: currentColor;
+}
+
+.area:focus {
+  outline: 1px dashed var(--accent);
+}

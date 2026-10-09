@@ -1,6 +1,7 @@
 // Função única de render: prévia e exportação passam por aqui, com a mesma pipeline.
 import type { Asset, Project } from '../../types/project';
-import type { Compositor, FrameImage, FrameProvider, Layer } from '../../types/render';
+import type { Compositor, FrameImage, FrameProvider, Layer, TextRasterizer } from '../../types/render';
+import { createTextRasterizer } from '../text/textRasterizer';
 import { resolveLayers } from './composition';
 
 /** Opções de um quadro composto: escala do quadro de saída, precisão e cor de fundo. */
@@ -21,13 +22,26 @@ interface FetchedLayer {
   frame: FrameImage;
 }
 
-/** Desenha o quadro do instante na escala pedida e devolve as camadas desenhadas. */
+/** Rasterizador padrão do contexto (thread principal ou worker), criado só na primeira camada de texto. */
+let sharedRasterizer: TextRasterizer | null = null;
+
+/** Devolve o rasterizador padrão do contexto, criando-o preguiçosamente. */
+function defaultRasterizer(): TextRasterizer {
+  sharedRasterizer ??= createTextRasterizer();
+  return sharedRasterizer;
+}
+
+/**
+ * Desenha o quadro do instante na escala pedida e devolve as camadas desenhadas.
+ * Camadas de texto são rasterizadas pelo rasterizador (dono do próprio cache), não pelo provider.
+ */
 export async function renderFrame(
   compositor: Compositor,
   project: Project,
   timelineMs: number,
   provider: FrameProvider,
   options: RenderFrameOptions,
+  textRasterizer?: TextRasterizer,
 ): Promise<Layer[]> {
   if (!(options.scale > 0)) throw new Error('invalid-render-scale');
   const layers = resolveLayers(project, timelineMs);
@@ -62,13 +76,8 @@ export async function renderFrame(
     throw failure.reason;
   }
 
-  const images = new Map<string, FrameImage>();
-  for (const item of fetched) {
-    images.set(item.layer.clipId, item.frame);
-  }
-  const drawn = fetched.map((item) => item.layer);
-
   try {
+    const { drawn, images } = assembleLayers(layers, fetched, textRasterizer);
     compositor.draw(drawn, images, {
       width: Math.round(project.width * options.scale),
       height: Math.round(project.height * options.scale),
@@ -76,10 +85,39 @@ export async function renderFrame(
       frameWidth: project.width,
       frameHeight: project.height,
     });
+    return drawn;
   } finally {
     releaseAll(provider, fetched);
   }
-  return drawn;
+}
+
+/**
+ * Junta as camadas na ordem de resolução: quadros obtidos e textos rasterizados.
+ * Camada de texto recebe o tamanho da imagem como tamanho natural.
+ */
+function assembleLayers(
+  layers: Layer[],
+  fetched: FetchedLayer[],
+  textRasterizer: TextRasterizer | undefined,
+): { drawn: Layer[]; images: Map<string, FrameImage> } {
+  const frames = new Map<Layer, FrameImage>(fetched.map((item) => [item.layer, item.frame]));
+  const drawn: Layer[] = [];
+  const images = new Map<string, FrameImage>();
+  for (const layer of layers) {
+    if (layer.text) {
+      const rasterizer = textRasterizer ?? defaultRasterizer();
+      const surface = rasterizer.rasterize(layer.text.data, layer.text.reveal);
+      drawn.push({ ...layer, sourceWidth: surface.width, sourceHeight: surface.height });
+      images.set(layer.clipId, surface);
+      continue;
+    }
+    const frame = frames.get(layer);
+    if (frame !== undefined) {
+      drawn.push(layer);
+      images.set(layer.clipId, frame);
+    }
+  }
+  return { drawn, images };
 }
 
 /** Pré-carrega quadros ao redor do instante para as camadas que estão tocando. */

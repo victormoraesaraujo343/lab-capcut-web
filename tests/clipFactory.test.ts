@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { Asset } from '@/types';
 import { IMAGE_DEFAULT_DURATION_MS } from '@/engine/timeline/constants';
-import { createClipFromAsset, trackKindForAsset } from '@/engine/timeline/clipFactory';
+import { createClipFromAsset, createTextClip, trackKindForAsset } from '@/engine/timeline/clipFactory';
+import { defaultTextStyle } from '@/engine/text/defaultTextStyle';
 
 /** Monta um asset de teste. */
 function asset(overrides: Partial<Asset> = {}): Asset {
@@ -59,6 +60,31 @@ describe('createClipFromAsset', () => {
     const a = createClipFromAsset(asset(), 'v1', 0);
     const b = createClipFromAsset(asset(), 'v1', 0);
     expect(a.id).not.toBe('');
+    expect(a.id).not.toBe(b.id);
+  });
+});
+
+describe('createTextClip', () => {
+  it('cria clipe de texto sem asset, com o conteúdo e o estilo dados', () => {
+    const style = defaultTextStyle();
+    const clip = createTextClip('t1', 250, 'Oi', style);
+    expect(clip.assetId).toBeUndefined();
+    expect(clip.trackId).toBe('t1');
+    expect(clip.startMs).toBe(250);
+    expect(clip.durationMs).toBe(3000);
+    expect(clip.text).toEqual({ content: 'Oi', style });
+    expect(clip.transform).toMatchObject({ x: 0, y: 0, scaleX: 1, scaleY: 1, opacity: 1, rotation: 0 });
+  });
+
+  it('aceita duração e início negativo vira zero', () => {
+    const clip = createTextClip('t1', -5, 'x', defaultTextStyle(), 1200);
+    expect(clip.startMs).toBe(0);
+    expect(clip.durationMs).toBe(1200);
+  });
+
+  it('gera id novo a cada chamada', () => {
+    const a = createTextClip('t1', 0, 'a', defaultTextStyle());
+    const b = createTextClip('t1', 0, 'b', defaultTextStyle());
     expect(a.id).not.toBe(b.id);
   });
 });

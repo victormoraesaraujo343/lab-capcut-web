@@ -70,13 +70,19 @@ export function transformPoint3(m: Float32Array, x: number, y: number): [number,
   ];
 }
 
+/** Tamanho base da camada: contain no quadro para mídia; tamanho natural em px do projeto quando fit é 'none' (texto). */
+function baseSize(layer: Layer, frameW: number, frameH: number): { width: number; height: number } {
+  if (layer.fit === 'none') return { width: layer.sourceWidth, height: layer.sourceHeight };
+  return containSize(layer.sourceWidth, layer.sourceHeight, frameW, frameH);
+}
+
 /** Tamanho visível da camada (já com escala e recorte) e deslocamento do centro recortado. */
 function visibleGeometry(
   layer: Layer,
   frameW: number,
   frameH: number,
 ): { quadW: number; quadH: number; offX: number; offY: number } {
-  const base = containSize(layer.sourceWidth, layer.sourceHeight, frameW, frameH);
+  const base = baseSize(layer, frameW, frameH);
   const t: Transform = layer.transform;
   const crop = t.crop;
   const fullW = base.width * t.scaleX;

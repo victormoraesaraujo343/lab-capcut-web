@@ -1,0 +1,110 @@
+/* Seletor de fonte: botão de abertura, lista rolável de fontes e busca. */
+
+.picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  width: 100%;
+  min-width: 0;
+  height: 26px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-panel-alt);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--font-size-md);
+  text-align: left;
+  cursor: pointer;
+}
+
+.trigger:hover {
+  background: var(--bg-hover);
+}
+
+.trigger:focus-visible {
+  outline: 1px solid var(--focus-ring);
+  outline-offset: 0;
+}
+
+.current {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-md);
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: 180px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.option {
+  display: block;
+  width: 100%;
+  padding: 3px var(--space-2);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font-size: var(--font-size-lg);
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.option:hover {
+  background: var(--bg-hover);
+}
+
+.option[aria-pressed='true'] {
+  color: var(--accent);
+}
+
+.option:focus-visible {
+  outline: 1px solid var(--focus-ring);
+  outline-offset: -1px;
+}
+
+.search {
+  margin: 0;
+}
+
+.note,
+.error {
+  margin: 0;
+  font-size: var(--font-size-sm);
+}
+
+.note {
+  color: var(--text-muted);
+}
+
+.error {
+  color: var(--danger);
+}

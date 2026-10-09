@@ -1,5 +1,6 @@
 // Retângulo de um clipe na trilha: cor por tipo, rótulo, miniaturas ou onda, seleção, arrasto, aparo e lâmina.
 import { memo, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { Type } from 'lucide-react';
 import { t } from '@/i18n/pt-BR';
 import type { Clip, Track, TrackKind } from '@/types';
 import { MIN_CLIP_MS } from '@/engine/timeline/constants';
@@ -29,6 +30,17 @@ const KIND_CLASS: Record<TrackKind, string | undefined> = {
   sticker: styles.kindSticker,
   effect: styles.kindEffect,
 };
+
+/** Rótulo de um clipe de texto: a primeira linha do conteúdo, com reticências se houver mais linhas. */
+function textLabel(content: string): string {
+  const lines = content
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line !== '');
+  const first = lines[0];
+  if (first === undefined) return t.timeline.clip;
+  return lines.length > 1 ? `${first}…` : first;
+}
 
 /** Propriedades de um clipe na trilha. */
 export interface ClipViewProps {
@@ -127,9 +139,12 @@ export const ClipView = memo(function ClipView({
     setBladeX(msToPx(ms - clip.startMs, zoom));
   }
 
+  const isText = clip.text !== undefined;
+  const label = clip.text ? textLabel(clip.text.content) : (asset?.name ?? t.timeline.clip);
+
   const classes = [
     styles.clip,
-    KIND_CLASS[track.kind],
+    isText ? styles.kindText : KIND_CLASS[track.kind],
     selected && styles.selected,
     dimmed && styles.dimmed,
     track.hidden && styles.hiddenTrack,
@@ -158,8 +173,11 @@ export const ClipView = memo(function ClipView({
         </div>
       ) : null}
       <span className={styles.label}>
-        {asset?.name ?? t.timeline.clip}
-        {showSpeed ? ` · ${speedLabel}` : null}
+        {isText ? <Type className={styles.icon} size={11} aria-hidden="true" /> : null}
+        <span className={styles.labelText}>
+          {label}
+          {showSpeed ? ` · ${speedLabel}` : null}
+        </span>
       </span>
       {!locked && !blade ? (
         <>

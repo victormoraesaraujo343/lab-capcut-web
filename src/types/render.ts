@@ -1,6 +1,6 @@
 // Tipos do motor de render: camadas resolvidas, fontes de quadro e compositor.
 // Contrato compartilhado entre composição, decodificação, compositor e prévia/exportação.
-import type { Asset, AssetKind, Transform } from './project';
+import type { Asset, AssetKind, TextData, Transform } from './project';
 import type { EffectInstance } from './effects';
 
 /** Imagem que o compositor sabe enviar como textura. */
@@ -32,6 +32,20 @@ export interface Layer {
   zIndex: number;
   /** Velocidade de reprodução da mídia neste instante (speed do clipe; 1 = normal). */
   playbackRate: number;
+  /** Como o tamanho base é calculado: 'contain' = mídia encaixada no quadro; 'none' = tamanho natural da imagem em px do projeto (texto). */
+  fit: 'contain' | 'none';
+  /** Só para camadas de texto: o conteúdo/estilo e quanto do texto já apareceu (0..1, animação de digitação). */
+  text?: { data: TextData; reveal: number };
+}
+
+/** Desenha texto num canvas 2D (funciona na thread principal e em worker). Mesmo desenho na prévia e na exportação. */
+export interface TextRasterizer {
+  /** Imagem do texto no tamanho natural em px do projeto; o mesmo conteúdo/estilo/reveal reutiliza a imagem do cache. */
+  rasterize(data: TextData, reveal: number): OffscreenCanvas | HTMLCanvasElement;
+  /** Tamanho natural (px do projeto) que o texto ocupará, sem desenhar. */
+  measure(data: TextData): { width: number; height: number };
+  /** Libera o cache de imagens. */
+  dispose(): void;
 }
 
 /** Opções de um pedido de quadro. */

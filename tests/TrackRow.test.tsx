@@ -3,6 +3,7 @@ import { cleanup, createEvent, fireEvent, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TrackRow } from '@/features/timeline/TrackRow';
 import { ASSET_DRAG_MIME } from '@/features/timeline/layout';
+import { defaultTextStyle } from '@/engine/text/defaultTextStyle';
 import { useTimelineStore } from '@/stores/timelineStore';
 import { addAssetToTimeline, selectClip } from '@/stores/timelineCommands';
 import { defaultAudioFx, defaultSpeed, defaultTransform, type Clip, type Track } from '@/types';
@@ -129,6 +130,17 @@ describe('TrackRow', () => {
     if (row === null) throw new Error('trilha não renderizada');
     fireEvent.drop(row, { dataTransfer: { types: [ASSET_DRAG_MIME], getData: () => 'asset1' } });
     expect(addAssetToTimeline).toHaveBeenCalledWith('asset1', 't1', expect.any(Number), 'overwrite');
+  });
+
+  it('clipe de texto mostra a primeira linha do conteúdo, com ícone e cor de texto', () => {
+    const text = { ...makeClip('a', 0, 1000), text: { content: 'Olá mundo\nsegunda linha', style: defaultTextStyle() } };
+    const track = makeTrack([text], { name: 'Legendas' });
+    const { container } = render(<TrackRow track={track} trackIndex={0} zoom={100} />);
+    const clip = container.querySelector<HTMLElement>('[data-clip-id="a"]');
+    expect(clip?.textContent).toContain('Olá mundo…');
+    expect(clip?.textContent).not.toContain('Clipe');
+    expect(clip?.className).toContain('kindText');
+    expect(clip?.querySelector('svg')).not.toBeNull();
   });
 
   it('trilha travada marca a linha e não seleciona clipes', () => {

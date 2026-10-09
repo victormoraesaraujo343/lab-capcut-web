@@ -9,18 +9,24 @@ import { exportGif } from '../src/engine/export/gifExport';
 import { createMuxer } from '../src/engine/export/muxers';
 import type { ExportMuxer } from '../src/engine/export/muxers';
 import { encodeVideo } from '../src/engine/export/videoEncode';
+import { ensureProjectFonts } from '../src/engine/text/fontLoader';
 
 vi.mock('../src/engine/export/videoEncode', () => ({ encodeVideo: vi.fn() }));
 vi.mock('../src/engine/export/audioEncode', () => ({ encodeAudio: vi.fn() }));
 vi.mock('../src/engine/export/muxers', () => ({ createMuxer: vi.fn() }));
 vi.mock('../src/engine/export/exportFrameProvider', () => ({ createExportFrameProvider: vi.fn() }));
 vi.mock('../src/engine/export/gifExport', () => ({ exportGif: vi.fn() }));
+vi.mock('../src/engine/text/fontLoader', () => ({ ensureProjectFonts: vi.fn(async () => undefined) }));
 
 const encodeVideoMock = vi.mocked(encodeVideo);
 const encodeAudioMock = vi.mocked(encodeAudio);
 const createMuxerMock = vi.mocked(createMuxer);
 const createProviderMock = vi.mocked(createExportFrameProvider);
 const exportGifMock = vi.mocked(exportGif);
+const ensureFontsMock = vi.mocked(ensureProjectFonts);
+
+/** URL base usada nos pedidos de teste. */
+const BASE = 'https://app.test/';
 
 const config: ResolvedExport = {
   format: 'mp4',
@@ -111,7 +117,7 @@ describe('runExportJob', () => {
     });
     const finalize = vi.spyOn(muxer, 'finalize');
 
-    await runExportJob({ project: projectWithVideo(), config, audio }, post, () => false, 7);
+    await runExportJob({ project: projectWithVideo(), config, audio, assetBaseUrl: BASE }, post, () => false, 7);
 
     expect(order).toEqual(['audio', 'video']);
     expect(finalize).toHaveBeenCalledTimes(1);
@@ -133,7 +139,7 @@ describe('runExportJob', () => {
     createMuxerMock.mockReturnValue(fakeMuxer(new ArrayBuffer(1)));
     encodeVideoMock.mockResolvedValue(undefined);
 
-    await runExportJob({ project: projectWithVideo(), config, audio: null }, post, () => false, 1);
+    await runExportJob({ project: projectWithVideo(), config, audio: null, assetBaseUrl: BASE }, post, () => false, 1);
 
     expect(encodeAudioMock).not.toHaveBeenCalled();
     expect(encodeVideoMock).toHaveBeenCalledTimes(1);
@@ -143,7 +149,7 @@ describe('runExportJob', () => {
     const { provider, dispose } = fakeProvider();
     createProviderMock.mockReturnValue(provider);
 
-    await runExportJob({ project: projectWithVideo(), config, audio }, post, () => true, 3);
+    await runExportJob({ project: projectWithVideo(), config, audio, assetBaseUrl: BASE }, post, () => true, 3);
 
     expect(posted.at(-1)).toEqual({ type: 'cancelled', jobId: 3 });
     expect(encodeVideoMock).not.toHaveBeenCalled();
@@ -159,7 +165,7 @@ describe('runExportJob', () => {
       cancelledFlag = true;
     });
 
-    await runExportJob({ project: projectWithVideo(), config, audio: null }, post, () => cancelledFlag, 4);
+    await runExportJob({ project: projectWithVideo(), config, audio: null, assetBaseUrl: BASE }, post, () => cancelledFlag, 4);
 
     expect(posted.at(-1)).toEqual({ type: 'cancelled', jobId: 4 });
     expect(posted.some((r) => r.type === 'done')).toBe(false);
@@ -180,7 +186,7 @@ describe('runExportJob', () => {
       encodeVideoMock.mockRejectedValueOnce(error);
       createMuxerMock.mockReturnValue(fakeMuxer(new ArrayBuffer(1)));
 
-      await runExportJob({ project: projectWithVideo(), config, audio: null }, post, () => false, 9);
+      await runExportJob({ project: projectWithVideo(), config, audio: null, assetBaseUrl: BASE }, post, () => false, 9);
 
       expect(posted.at(-1)).toMatchObject({ type: 'error', jobId: 9, code });
       expect(dispose).toHaveBeenCalledTimes(1);
@@ -188,7 +194,7 @@ describe('runExportJob', () => {
   });
 
   it('posta empty quando não há camada visual nem áudio', async () => {
-    await runExportJob({ project: emptyProject(), config, audio: null }, post, () => false, 2);
+    await runExportJob({ project: emptyProject(), config, audio: null, assetBaseUrl: BASE }, post, () => false, 2);
 
     expect(posted).toEqual([expect.objectContaining({ type: 'error', code: 'empty' })]);
     expect(encodeVideoMock).not.toHaveBeenCalled();
@@ -197,7 +203,7 @@ describe('runExportJob', () => {
   it('posta no-webcodecs quando faltam os codificadores do formato', async () => {
     vi.unstubAllGlobals();
 
-    await runExportJob({ project: projectWithVideo(), config, audio: null }, post, () => false, 5);
+    await runExportJob({ project: projectWithVideo(), config, audio: null, assetBaseUrl: BASE }, post, () => false, 5);
 
     expect(posted).toEqual([expect.objectContaining({ type: 'error', code: 'no-webcodecs' })]);
   });
@@ -209,7 +215,7 @@ describe('runExportJob', () => {
     exportGifMock.mockResolvedValue(gifBuffer);
 
     await runExportJob(
-      { project: projectWithVideo(), config: { ...config, format: 'gif', mimeType: 'image/gif', fileName: 'a.gif' }, audio },
+      { project: projectWithVideo(), config: { ...config, format: 'gif', mimeType: 'image/gif', fileName: 'a.gif' }, audio, assetBaseUrl: BASE },
       post,
       () => false,
       6,
@@ -218,5 +224,19 @@ describe('runExportJob', () => {
     expect(encodeAudioMock).not.toHaveBeenCalled();
     expect(posted.at(-1)).toEqual({ type: 'done', jobId: 6, data: gifBuffer, mimeType: 'image/gif', fileName: 'a.gif' });
     expect(dispose).toHaveBeenCalledTimes(1);
+  });
+  it('carrega as fontes do projeto antes de criar o provedor de quadros', async () => {
+    const { provider } = fakeProvider();
+    createProviderMock.mockReturnValue(provider);
+    createMuxerMock.mockReturnValue(fakeMuxer(new ArrayBuffer(1)));
+    encodeVideoMock.mockResolvedValue(undefined);
+    const project = projectWithVideo();
+
+    await runExportJob({ project, config, audio: null, assetBaseUrl: BASE }, post, () => false, 10);
+
+    expect(ensureFontsMock).toHaveBeenCalledWith(project, BASE);
+    expect(ensureFontsMock.mock.invocationCallOrder[0] ?? Infinity).toBeLessThan(
+      createProviderMock.mock.invocationCallOrder[0] ?? 0,
+    );
   });
 });
