@@ -1,0 +1,35 @@
+// Shaders GLSL ES 3.00 do compositor: desenha um quad unitário com textura, recorte e opacidade.
+
+/** Vertex shader: leva o quad unitário [-0.5, 0.5]² a clip space e calcula o UV recortado. */
+export const VERTEX_SHADER = `#version 300 es
+in vec2 a_position;
+uniform mat3 u_matrix;
+uniform vec4 u_uvRect;
+out vec2 v_uv;
+
+void main() {
+  vec3 clip = u_matrix * vec3(a_position, 1.0);
+  gl_Position = vec4(clip.xy, 0.0, 1.0);
+  // u_uvRect = [u0, v0, u1, v1] em espaço de imagem (origem no canto superior esquerdo).
+  // a_position.y cresce para cima, então o UV vertical é invertido.
+  vec2 unit = a_position + vec2(0.5);
+  v_uv = vec2(
+    mix(u_uvRect.x, u_uvRect.z, unit.x),
+    mix(u_uvRect.y, u_uvRect.w, 1.0 - unit.y)
+  );
+}
+`;
+
+/** Fragment shader: amostra a textura (já pré-multiplicada) e aplica a opacidade da camada. */
+export const FRAGMENT_SHADER = `#version 300 es
+precision mediump float;
+in vec2 v_uv;
+uniform sampler2D u_texture;
+uniform float u_opacity;
+out vec4 outColor;
+
+void main() {
+  // A textura chega pré-multiplicada (UNPACK_PREMULTIPLY_ALPHA_WEBGL), então escalar tudo mantém o formato.
+  outColor = texture(u_texture, v_uv) * u_opacity;
+}
+`;

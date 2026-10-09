@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { SlidersHorizontal, type LucideIcon } from 'lucide-react';
 import { t } from '../../i18n/pt-BR';
 import { runWithToast, useProjectStore, useUiStore } from '../../stores';
@@ -6,7 +6,10 @@ import { TopBar } from '../layout/TopBar';
 import { PanelShell } from '../layout/PanelShell';
 import { MediaPanel } from '@/features/media/MediaPanel';
 import { TimelinePanel } from '@/features/timeline/TimelinePanel';
+import { PreviewPanel } from '@/features/preview/PreviewPanel';
+import { TransformOverlay } from '@/features/preview/TransformOverlay';
 import { ResizeHandle } from '../../components/ResizeHandle';
+import { HANDLE_SIZE, TOP_BAR_HEIGHT, computeEditorLayout } from './editorLayout';
 import styles from './EditorScreen.module.css';
 
 type ResizableKey = 'mediaWidth' | 'inspectorWidth' | 'timelineHeight';
@@ -27,9 +30,27 @@ function EmptyState({ icon: Icon, text }: { icon: LucideIcon; text: string }) {
   );
 }
 
-/** Célula da grade do editor, posicionada pela classe recebida. */
-function Cell({ className, children }: { className: string | undefined; children: ReactNode }) {
-  return <div className={`${styles.cell} ${className ?? ''}`}>{children}</div>;
+/** Célula da grade do editor, posicionada pela classe e, se houver, pela coluna recebida. */
+function Cell({
+  className,
+  column,
+  children,
+}: {
+  className: string | undefined;
+  column?: number;
+  children: ReactNode;
+}) {
+  const style = column === undefined ? undefined : { gridColumn: column };
+  return (
+    <div className={`${styles.cell} ${className ?? ''}`} style={style}>
+      {children}
+    </div>
+  );
+}
+
+/** Lê a largura e a altura da janela. */
+function readViewport(): { w: number; h: number } {
+  return { w: window.innerWidth, h: window.innerHeight };
 }
 
 /** Tela do editor: barra superior, quatro painéis e alças de redimensionamento. */
@@ -42,6 +63,19 @@ export function EditorScreen() {
   const mediaWidth = useUiStore((s) => s.panelSizes.mediaWidth);
   const inspectorWidth = useUiStore((s) => s.panelSizes.inspectorWidth);
   const timelineHeight = useUiStore((s) => s.panelSizes.timelineHeight);
+  const [viewport, setViewport] = useState(readViewport);
+
+  useEffect(() => {
+    const onResize = () => setViewport(readViewport());
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  const layout = computeEditorLayout(viewport.w, viewport.h, {
+    mediaWidth,
+    inspectorWidth,
+    timelineHeight,
+  });
 
   if (project === null) {
     return null;
@@ -52,12 +86,23 @@ export function EditorScreen() {
     void runWithToast(renameProjectById(project.id, name), t.errors.projectRename);
   };
 
+  // Colunas visíveis, na ordem da grade; painéis escondidos não entram.
+  const columns: Array<{ key: string; size: string }> = [];
+  if (layout.showMedia) {
+    columns.push({ key: 'media', size: `${layout.mediaWidth}px` }, { key: 'handleMedia', size: `${HANDLE_SIZE}px` });
+  }
+  columns.push({ key: 'preview', size: 'minmax(0, 1fr)' });
+  if (layout.showInspector) {
+    columns.push({ key: 'handleInspector', size: `${HANDLE_SIZE}px` }, { key: 'inspector', size: `${layout.inspectorWidth}px` });
+  }
+  const colOf = (key: string): number => columns.findIndex((c) => c.key === key) + 1;
+
   return (
     <div
       className={styles.editor}
       style={{
-        gridTemplateColumns: `${mediaWidth}px 4px minmax(0, 1fr) 4px ${inspectorWidth}px`,
-        gridTemplateRows: `44px minmax(0, 1fr) 4px ${timelineHeight}px`,
+        gridTemplateColumns: columns.map((c) => c.size).join(' '),
+        gridTemplateRows: `${TOP_BAR_HEIGHT}px minmax(0, 1fr) ${HANDLE_SIZE}px ${layout.timelineHeight}px`,
       }}
     >
       <Cell className={styles.top}>
@@ -70,41 +115,45 @@ export function EditorScreen() {
         />
       </Cell>
 
-      <Cell className={styles.media}>
-        <MediaPanel />
+      {layout.showMedia && (
+        <>
+          <Cell className={styles.media} column={colOf('media')}>
+            <MediaPanel />
+          </Cell>
+
+          <Cell className={styles.handleMedia} column={colOf('handleMedia')}>
+            <ResizeHandle
+              orientation="vertical"
+              label={t.resize.media}
+              onResize={(delta) => adjustPanel('mediaWidth', delta)}
+            />
+          </Cell>
+        </>
+      )}
+
+      <Cell className={styles.preview} column={colOf('preview')}>
+        <PreviewPanel>
+          <TransformOverlay />
+        </PreviewPanel>
       </Cell>
 
-      <Cell className={styles.handleMedia}>
-        <ResizeHandle
-          orientation="vertical"
-          label={t.resize.media}
-          onResize={(delta) => adjustPanel('mediaWidth', delta)}
-        />
-      </Cell>
+      {layout.showInspector && (
+        <>
+          <Cell className={styles.handleInspector} column={colOf('handleInspector')}>
+            <ResizeHandle
+              orientation="vertical"
+              label={t.resize.inspector}
+              onResize={(delta) => adjustPanel('inspectorWidth', -delta)}
+            />
+          </Cell>
 
-      <Cell className={styles.preview}>
-        <PanelShell title={t.panels.preview}>
-          <div className={styles.stage}>
-            <div className={styles.screen}>
-              <span className={styles.screenText}>{t.preview.empty}</span>
-            </div>
-          </div>
-        </PanelShell>
-      </Cell>
-
-      <Cell className={styles.handleInspector}>
-        <ResizeHandle
-          orientation="vertical"
-          label={t.resize.inspector}
-          onResize={(delta) => adjustPanel('inspectorWidth', -delta)}
-        />
-      </Cell>
-
-      <Cell className={styles.inspector}>
-        <PanelShell title={t.panels.inspector}>
-          <EmptyState icon={SlidersHorizontal} text={t.inspector.empty} />
-        </PanelShell>
-      </Cell>
+          <Cell className={styles.inspector} column={colOf('inspector')}>
+            <PanelShell title={t.panels.inspector}>
+              <EmptyState icon={SlidersHorizontal} text={t.inspector.empty} />
+            </PanelShell>
+          </Cell>
+        </>
+      )}
 
       <Cell className={styles.handleTimeline}>
         <ResizeHandle

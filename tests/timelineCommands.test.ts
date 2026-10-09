@@ -1,6 +1,8 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { cancelPendingSave } from '@/stores/projectPersistence';
+import { defaultTransform } from '@/types';
+import { patchClipTransform, resetClipTransform, setClipTransform } from '@/stores/timelineCommands';
 import { useProjectStore } from '@/stores/projectStore';
 import { usePlaybackStore } from '@/stores/playbackStore';
 import { useTimelineStore } from '@/stores/timelineStore';
@@ -239,5 +241,49 @@ describe('timelineCommands', () => {
     expect(usePlaybackStore.getState().currentTimeMs).toBe(2000);
     goToEdge('prev');
     expect(usePlaybackStore.getState().currentTimeMs).toBe(1000);
+  });
+
+  it('setClipTransform, patchClipTransform e resetClipTransform: um passo de histórico por chamada, e undo volta', () => {
+    const project = openProject([makeAsset('a1')]);
+    addAssetToTimeline('a1', project.tracks[0]?.id ?? null, 0, 'overwrite');
+    const clipId = clipAt(0).id;
+    const pastBefore = useTimelineStore.getState().history.past.length;
+
+    setClipTransform(clipId, { ...defaultTransform(), x: 50 });
+    expect(clipAt(0).transform.x).toBe(50);
+    expect(useTimelineStore.getState().history.past).toHaveLength(pastBefore + 1);
+
+    patchClipTransform(clipId, { opacity: 0.5, crop: { left: 0.1 } });
+    expect(clipAt(0).transform.x).toBe(50);
+    expect(clipAt(0).transform.opacity).toBe(0.5);
+    expect(clipAt(0).transform.crop).toEqual({ top: 0, right: 0, bottom: 0, left: 0.1 });
+    expect(useTimelineStore.getState().history.past).toHaveLength(pastBefore + 2);
+
+    resetClipTransform(clipId);
+    expect(clipAt(0).transform).toEqual(defaultTransform());
+    expect(useTimelineStore.getState().history.past).toHaveLength(pastBefore + 3);
+
+    useTimelineStore.getState().undo();
+    expect(clipAt(0).transform.opacity).toBe(0.5);
+    useTimelineStore.getState().undo();
+    expect(clipAt(0).transform.x).toBe(50);
+    expect(clipAt(0).transform.opacity).toBe(1);
+  });
+
+  it('transformação em trilha travada não muda nem entra no histórico', () => {
+    const project = openProject([makeAsset('a1')]);
+    const videoId = project.tracks[0]?.id ?? '';
+    addAssetToTimeline('a1', videoId, 0, 'overwrite');
+    const clipId = clipAt(0).id;
+    toggleTrackFlag(videoId, 'locked');
+    const pastBefore = useTimelineStore.getState().history.past.length;
+    const before = tracksNow();
+
+    setClipTransform(clipId, { ...defaultTransform(), x: 99 });
+    patchClipTransform(clipId, { rotation: 90 });
+    resetClipTransform(clipId);
+
+    expect(tracksNow()).toEqual(before);
+    expect(useTimelineStore.getState().history.past).toHaveLength(pastBefore);
   });
 });

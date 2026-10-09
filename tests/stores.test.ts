@@ -38,6 +38,18 @@ describe('playbackStore', () => {
     usePlaybackStore.getState().seek(-500);
     expect(usePlaybackStore.getState().currentTimeMs).toBe(0);
   });
+
+  it('seek com máximo prende a posição no fim do projeto', () => {
+    usePlaybackStore.getState().seek(9000, 4000);
+    expect(usePlaybackStore.getState().currentTimeMs).toBe(4000);
+    usePlaybackStore.getState().seek(1500, 4000);
+    expect(usePlaybackStore.getState().currentTimeMs).toBe(1500);
+  });
+
+  it('seek com máximo zero (projeto vazio) fica em 0', () => {
+    usePlaybackStore.getState().seek(800, 0);
+    expect(usePlaybackStore.getState().currentTimeMs).toBe(0);
+  });
 });
 
 describe('uiStore', () => {

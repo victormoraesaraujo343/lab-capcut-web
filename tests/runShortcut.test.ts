@@ -137,6 +137,14 @@ describe("runShortcut", () => {
     expect(usePlaybackStore.getState().currentTimeMs).toBeCloseTo(1000);
   });
 
+  it("frameForward não passa do fim do projeto", () => {
+    usePlaybackStore.getState().seek(8990);
+    runShortcut("frameForward");
+    expect(usePlaybackStore.getState().currentTimeMs).toBe(9000);
+    runShortcut("frameForward");
+    expect(usePlaybackStore.getState().currentTimeMs).toBe(9000);
+  });
+
   it("frameBack sem projeto não trata a ação", () => {
     useProjectStore.setState({ project: null });
     expect(runShortcut("frameBack")).toBe(false);

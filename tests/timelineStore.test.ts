@@ -205,6 +205,20 @@ describe('projectStore.setTracks e playbackStore.stepFrame', () => {
     expect(usePlaybackStore.getState().currentTimeMs).toBe(0);
   });
 
+  it('stepFrame para frente para no máximo informado', () => {
+    usePlaybackStore.getState().seek(990);
+    usePlaybackStore.getState().stepFrame(1, 25, 1000);
+    expect(usePlaybackStore.getState().currentTimeMs).toBe(1000);
+    usePlaybackStore.getState().stepFrame(1, 25, 1000);
+    expect(usePlaybackStore.getState().currentTimeMs).toBe(1000);
+  });
+
+  it('stepFrame sem máximo segue andando além da duração', () => {
+    usePlaybackStore.getState().seek(990);
+    usePlaybackStore.getState().stepFrame(1, 25);
+    expect(usePlaybackStore.getState().currentTimeMs).toBe(1030);
+  });
+
   it('stepFrame com fps inválido não muda a posição', () => {
     usePlaybackStore.getState().seek(200);
     usePlaybackStore.getState().stepFrame(1, 0);

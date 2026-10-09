@@ -1,0 +1,91 @@
+/* Caixa de manipulação sobre a prévia: contorno, alças de canto, alça de giro e guias de centro. */
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+  outline: none;
+}
+
+.overlay:focus-visible {
+  box-shadow: inset 0 0 0 1px var(--focus-ring);
+}
+
+.svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.outline {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5px;
+}
+
+.outlineLocked {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5px;
+  stroke-dasharray: 5 4;
+  opacity: 0.7;
+}
+
+.connector {
+  stroke: var(--accent);
+  stroke-width: 1.5px;
+}
+
+.handle {
+  position: absolute;
+  box-sizing: border-box;
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--bg-panel);
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.rotate {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 28px;
+  height: 28px;
+  border: 1.5px solid var(--accent);
+  border-radius: 50%;
+  background: var(--bg-panel);
+  color: var(--accent);
+  cursor: grab;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.guideVertical,
+.guideHorizontal {
+  position: absolute;
+  pointer-events: none;
+}
+
+.guideVertical {
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  border-left: 1px dashed var(--accent);
+}
+
+.guideHorizontal {
+  left: 0;
+  right: 0;
+  top: 50%;
+  border-top: 1px dashed var(--accent);
+}

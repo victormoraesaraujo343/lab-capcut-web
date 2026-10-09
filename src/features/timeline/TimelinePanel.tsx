@@ -12,7 +12,6 @@ import { TrackHeader } from './TrackHeader';
 import { TrackRow } from './TrackRow';
 import { TimelineToolbar } from './TimelineToolbar';
 import { useMarqueeSelection } from './useMarqueeSelection';
-import { usePlaybackClock } from './usePlaybackClock';
 import { useTimelineShortcuts } from './useTimelineShortcuts';
 import { contentWidthPx, wheelZoomFactor, zoomAroundPoint } from './zoomMath';
 import styles from './TimelinePanel.module.css';
@@ -40,7 +39,6 @@ function assetDropMs(event: DragEvent<HTMLDivElement>, container: HTMLDivElement
 /** Painel da linha do tempo com cabeçalhos, régua, faixas e cursor de reprodução. */
 export function TimelinePanel() {
   useTimelineShortcuts();
-  usePlaybackClock();
   const hasProject = useProjectStore((state) => state.project !== null);
   const tracks = useProjectStore((state) => state.project?.tracks ?? EMPTY_TRACKS);
   const durationMs = useProjectStore((state) => state.project?.durationMs ?? 0);

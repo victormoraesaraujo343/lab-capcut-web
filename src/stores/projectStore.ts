@@ -11,7 +11,8 @@ import {
   saveProject,
   type ProjectSummary,
 } from '@/engine/storage/db';
-import { computeProjectDuration, type Asset, type Project, type Track } from '@/types';
+import { computeProjectDuration, type Asset, type AspectRatio, type Project, type Track } from '@/types';
+import { sizeForAspect } from '@/engine/project/aspect';
 import {
   importSequentially,
   removeAssetFiles,
@@ -74,6 +75,8 @@ export interface ProjectState {
   deleteFolder: (id: string) => void;
   /** Move um asset para uma pasta, ou para a raiz com undefined. */
   moveAssetToFolder: (assetId: string, folderId: string | undefined) => void;
+  /** Troca a proporção do projeto aberto e ajusta largura e altura ao preset dela. */
+  setAspectRatio: (aspect: AspectRatio) => void;
 }
 
 /** Fila das importações: cada lote começa só depois do anterior terminar. */
@@ -224,5 +227,9 @@ export const useProjectStore = create<ProjectState>()((set, get) => {
 
     // Move um asset entre pastas.
     moveAssetToFolder: (assetId, folderId) => updateProject((p) => withAssetFolder(p, assetId, folderId)),
+
+    // Troca a proporção e o tamanho do projeto aberto.
+    setAspectRatio: (aspect) =>
+      updateProject((p) => ({ ...p, aspectRatio: aspect, ...sizeForAspect(aspect, p) })),
   };
 });

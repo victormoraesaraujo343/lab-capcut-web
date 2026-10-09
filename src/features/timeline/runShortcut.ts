@@ -91,9 +91,9 @@ export function runShortcut(action: ShortcutAction): boolean {
       return true;
     case 'frameBack':
     case 'frameForward': {
-      const fps = useProjectStore.getState().project?.fps;
-      if (fps === undefined) return false;
-      usePlaybackStore.getState().stepFrame(action === 'frameBack' ? -1 : 1, fps);
+      const project = useProjectStore.getState().project;
+      if (project === null) return false;
+      usePlaybackStore.getState().stepFrame(action === 'frameBack' ? -1 : 1, project.fps, project.durationMs);
       return true;
     }
     case 'goToStart':

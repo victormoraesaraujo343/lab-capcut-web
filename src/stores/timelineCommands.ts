@@ -1,7 +1,15 @@
 // Comandos de alto nível da timeline: cada um calcula a edição com as funções puras e a aplica via timelineStore.edit.
 import type { Asset, Track } from '@/types';
+import { defaultTransform, type Transform } from '@/types';
 import { t } from '@/i18n/pt-BR';
-import { findClip, splitAt, trimClipEnd, trimClipStart, trimToTime } from '@/engine/timeline/clipOps';
+import {
+  findClip,
+  splitAt,
+  trimClipEnd,
+  trimClipStart,
+  trimToTime,
+  updateClip,
+} from '@/engine/timeline/clipOps';
 import { createClipFromAsset, trackKindForAsset } from '@/engine/timeline/clipFactory';
 import { findEdge } from '@/engine/timeline/snap';
 import {
@@ -245,4 +253,35 @@ export function selectClip(id: string, additive: boolean): void {
   const ids = expandWithGroups(currentTracks(), [id]);
   const store = useTimelineStore.getState();
   store.selectClips(additive ? [...new Set([...store.selectedClipIds, ...ids])] : ids);
+}
+
+/** Campos de transformação a alterar; o recorte pode vir parcial e é mesclado com o atual. */
+export type TransformPatch = Partial<Omit<Transform, 'crop'>> & { crop?: Partial<Transform['crop']> };
+
+/** Troca a transformação inteira de um clipe, em um passo de histórico. */
+export function setClipTransform(clipId: string, transform: Transform, label = 'transform'): void {
+  runEdit(label, (tracks) => ({
+    tracks: updateClip(tracks, clipId, (c) => ({ ...c, transform })),
+  }));
+}
+
+/** Mescla campos na transformação de um clipe, em um passo de histórico. */
+export function patchClipTransform(clipId: string, patch: TransformPatch): void {
+  runEdit('transform', (tracks) => ({
+    tracks: updateClip(tracks, clipId, (c) => ({
+      ...c,
+      transform: {
+        ...c.transform,
+        ...patch,
+        crop: { ...c.transform.crop, ...patch.crop },
+      },
+    })),
+  }));
+}
+
+/** Volta a transformação de um clipe aos valores padrão, em um passo de histórico. */
+export function resetClipTransform(clipId: string): void {
+  runEdit('reset-transform', (tracks) => ({
+    tracks: updateClip(tracks, clipId, (c) => ({ ...c, transform: defaultTransform() })),
+  }));
 }
